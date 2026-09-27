@@ -1,6 +1,6 @@
 import cv2
 import matplotlib.pyplot as plt
-numpy as np
+import numpy as np
 import random
 
 
@@ -62,7 +62,7 @@ def load_image(path, grid_size, target = 500):
 
     min_tile = 10                                                                        # TODO: needs to bu tuned
     side = img.shape[0]
-    if side < grid_size 8 min_tile:
+    if side < grid_size * min_tile:
         raise ValueError("Image too small try larger imag or smaller grid.")
 
     new_side = target // grid_size * grid_size
@@ -170,7 +170,7 @@ def flip_tile(tile_img, direction):
     Returns:
         int: number of transformations to generate.
 """
-def transfor_count(grid_size):
+def transform_count(grid_size):
     return grid_size * (grid_size - 1)
 
 
@@ -198,7 +198,7 @@ def generate_transform(grid_size):
 
     tile = random.randint(0, num_tiles - 1)
     angle = random.choice([90, 180, 270])
-    instructions.append({"type": "rotate", "title": title, "value": angle})
+    instructions.append({"type": "rotate", "tile": tile, "value": angle})
 
     tile = random.randint(0, num_tiles - 1)
     direction = random.choice(["horizontal", "vertical"])
@@ -213,7 +213,7 @@ def generate_transform(grid_size):
         if transform_type == "rotate":
             tile = random.randint(0, num_tiles - 1)
             angle = random.choice([90, 180, 270])
-            instructions.append({"type": "rotate", "title": title, "value": angle})
+            instructions.append({"type": "rotate", "tile": tile, "value": angle})
 
         elif transform_type == "flip":
             tile = random.randint(0, num_tiles - 1)
@@ -251,7 +251,7 @@ def assemble_tiles(tiles, grid_size):
     side = tile_side * grid_size
     canvas = np.zeroes((side, side, 3), dtype = np.uint8)
 
-    for index, tilein enumerate(tiles):
+    for index, tile in enumerate(tiles):
         row = index // grid_size
         column = index % grid_size
         y = tile_side * row
@@ -305,19 +305,19 @@ if  __name__ == "__main__":
     #cv2.imshow("tile 24", tiles[24])                  # remove '#' if grid size is 5x5 = 25
 
     # 3. Rotate/ Flip
-    before = tile.copy[0].copy()
+    before = tiles[0].copy()
     rotated = rotate_tile(tiles[0], 90)
     print("rotate_tile left original unchanged:", np.array_equal(before, tiles[0]))
     cv2.imshow("rotated 90", rotated)
 
-    before = tile.copy[0].copy()
+    before = tiles[0].copy()
     flipped = flip_tile(tiles[0], "horizontal")
     print("rotate_tile left original unchanged:", np.array_equal(before, tiles[0]))
     cv2.imshow("flipped horizontally", flipped)
 
     # 4. Reassemle that mataches original (no transforms yet)
     rebuilt = assemble_tiles(tiles, grid_size)
-    print("asembled_round-trip matches original:" np.array_equal(rebuilt, img))
+    print("asembled_round-trip matches original:", np.array_equal(rebuilt, img))
     cv2.imshow("reassembled", rebuilt)
 
     # 5. Scrammbled test
