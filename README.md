@@ -55,7 +55,7 @@ def on_tile_click(event):
         selected_tile = None
 
 
-###     Practice Window to test code        ###
+#Practice Window to test code
 root = tk.Tk()
 root.title("Tile Border Selection")
 root.geometry("300x300")
