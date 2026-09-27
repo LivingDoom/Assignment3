@@ -1,0 +1,342 @@
+import cv2
+import matplotlib.pyplot as plt
+numpy as np
+import random
+
+
+
+# TODO: match parameter names with other members
+# NOTE: No function for swap tiles. It is in Ibi's code.
+
+
+
+
+""" 
+    Makes loaded image into square by cropping from the center of the image.
+
+    Paramters:
+        img: (numpy.ndarray) image loadeded in.
+
+    Returns:
+        numpy.ndarray: the cropped square image. returned image takes the smaller side and crops the longer side.
+"""
+def make_square_img(img):
+    height, width = img.shape[:2]
+    side = min(height, width)
+    top = (height - side) // 2
+    left = (width - side) // 2
+    cropped_img = img[top : top + side , left : left + side]
+
+    return cropped_img
+
+
+
+
+
+""" 
+    Load an image and prepare it for the puzzle. Image is center cropped to a square. Then  resized sides to divide evenly based on grid.
+
+    Parameters:
+        path: (str) File path to image.
+        grid_size: (int)  tiles per side, 3x3, 4x4, 5x5
+        target: (int) approximate side length in pixels. the actual side may be smaller, as it is rounded to a multiple of grid size.
+
+    Returns:
+        numpy.ndarray: returns a square image.
+
+    Errors:
+        FileNotFoundError: file could not be opened. either bad path or file not an image.
+        ValueError: image too small for chosen grid size.
+
+    NOTES:
+        TODO: 'target = 500' needs to be change. depends on window size, confirm with Jono.
+        TODO: need exact square pixel size for 'Original image' and 'Puzzle image' windows from picture sent by Jono
+"""
+def load_image(path, grid_size, target = 500):
+    img  = cv2.imread(path)
+
+    if img is None:
+        raise FileNotFoundError("File could not be opened. Try different file.")
+
+    img = make_square_img(img)
+
+    min_tile = 10                                                                        # TODO: needs to bu tuned
+    side = img.shape[0]
+    if side < grid_size 8 min_tile:
+        raise ValueError("Image too small try larger imag or smaller grid.")
+
+    new_side = target // grid_size * grid_size
+
+    img = cv2.resize(img, (new_side, new_side))
+
+    return img
+
+
+
+
+
+"""
+    Cuts the square image into tiles based on grid size selected.
+
+    Parameters:
+        img: (numpy.ndarray) the cropped square loaded image. easily divisible.
+        grid_size: (int) grid size selected. 3x3, 4x4, 5x5
+
+    Returns:
+        tiles: a list of grid_size * grid_size tiles of the image.
+               in row-major order (index 0 = top-left, last index = bottom right)
+
+    NOTES:
+         This function does not check taht image side divides evenly by grid_size. If it doesn't, the extra pixels are silently dropped from the right/bottom of the image.
+"""
+def split_into_tiles(img, grid_size):
+    tile_side = img.shape[0] // grid_size
+    tiles = []
+
+    for rows in range(grid_size):
+        for columns in range(grid_size):
+            y = tile_side * rows
+            x = tile_side * columns
+            tile = img[y : y + tile_side , x : x + tile_side].copy()
+
+    return tiles
+
+
+
+
+"""
+    Rotates a tile image by 90, 180, 270 degrees.
+
+    Parameters:
+        tile_img: (numpy.ndarray) the tile image to be rotated.
+        angle: (int)  rotation angle in degrees, 90, 180, 270
+
+    Returns:
+        numpy.ndarray: the rotated tile image.
+
+    Errors:
+        ValueError: angle is not 90, 180, 270.
+
+    NOTES:
+        TODO: 'angles' and its values may need to change.
+"""
+def rotate_tile(tile_img, angle):
+    if angle == 90:
+        return cv2.rotate(tile_img, cv2.ROTATE_90_CLOCKWISE)
+    if angle == 180:
+        return cv2.rotate(tile_img, cv2.ROTATE_180)
+    if angle == 270:
+        return cv2.rotate(tile_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    else:
+        raise ValueError(f"Invalid angle: {angle}. Must be 90, 180, or 270.")
+
+
+
+
+"""
+    Flips tile image horizontally or vertically.
+
+    Parameters:
+        tile_img: (numpy.ndarray) the tile image to be flipped.
+        direction: (str) direction of the flip. horizontal or vertical.
+
+    Returns:
+        numpy.ndarray: flipped tile image.
+
+    Errors:
+        ValueError: directional flip must be horizontal or vertical. rejects any other directions.
+
+    NOTES:
+        TODO: 'direction' and its values may need to cahnge.
+"""
+def flip_tile(tile_img, direction):
+    if direction == 'horizontal':
+        return cv2.flip(tile_img, 1)
+    if direction == 'vertical':
+        return cv2.flip(tile_img, 0)
+
+    else:
+        raise ValueError("Invalid direction: {direction}. Must be horizontal or vertical.")
+
+
+
+
+"""
+    Calculates how many transformations based on grid size selected. 6 for 3x3, 12 for 4x4, 20 for 5x5.
+
+    Parameters:
+        grid_size: (int) grid size selected. 3x3, 4x4, 5x5
+
+    Returns:
+        int: number of transformations to generate.
+"""
+def transfor_count(grid_size):
+    return grid_size * (grid_size - 1)
+
+
+
+
+"""
+    Generates the random transforms of each tile from flipping, rotating, swapping.
+
+    Parameters:
+        grid_size: (int) grid size chosen by user.
+
+    Returns:
+        list[dict]: dictionary of all transform moves dopne. 
+                    categorized by transform type, tile transformed, value of transform.
+
+    NOTE:
+        - Need to cahng this to to produce tuples to match Ibi's code.
+        - the same tile can appear in more than one instruction; nothing prevents a tile from being transformed again in one scramble.
+        - swap instruction never picks the same tile twice. so swap always affect two different tiles.
+"""
+def generate_transform(grid_size):
+    count = transform_count(grid_size)
+    num_tiles = grid_size * grid_size
+    instructions = []
+
+    tile = random.randint(0, num_tiles - 1)
+    angle = random.choice([90, 180, 270])
+    instructions.append({"type": "rotate", "title": title, "value": angle})
+
+    tile = random.randint(0, num_tiles - 1)
+    direction = random.choice(["horizontal", "vertical"])
+    instructions.append({"type": "flip", "tile": tile, "value": direction})
+
+    tile_a. tile_b = random.sample(range(num_tiles), 2)
+    instructions.append({"swap": "flip", "tile": tile_a, "value": tile_b})
+
+    for i in range(count - 3):
+        transform_type = random.choice(["rotate", "flip", "swap"])
+
+        if transform_type == "rotate":
+            tile = random.randint(0, num_tiles - 1)
+            angle = random.choice([90, 180, 270])
+            instructions.append({"type": "rotate", "title": title, "value": angle})
+
+        elif transform_type == "flip":
+            tile = random.randint(0, num_tiles - 1)
+            direction = random.choice(["horizontal", "vertical"])
+            instructions.append({"type": "flip", "tile": tile, "value": direction})
+
+        else:
+            tile_a, tile_b = random.sample(range(num_tiles), 2)
+            instructions.append({"type": "swap", "tile": tile_a, "value": tile_b})
+
+    return instructions
+
+
+
+
+"""
+    Reassembles a list of tiles into a single image, reflecting the state the tiles are currently in.
+    Meant to be called repeatedly:
+        once at the start to show the scrambled puzzle.
+        again after every player move to redraw the current puzzle state.
+
+    Parameters:
+        tile: list[numpy.ndarray] tiles from the split image.
+        grid_size: (int) grid size selected.
+
+    Returns:
+        numpy.ndarray: a fresh array of the reconstructed image, built from each tile's current position in the list.
+
+    NOTES:
+        - this function trusts the tile list is complete. eg. tile at index[0] is at row = 0, column = 0, etc.
+        - Has no way to check if the tiles are still in their original position, if the tiles were flipped, swapped, rotated.
+"""
+def assemble_tiles(tiles, grid_size):
+    tile_side = tiles[0].shape[0]
+    side = tile_side * grid_size
+    canvas = np.zeroes((side, side, 3), dtype = np.uint8)
+
+    for index, tilein enumerate(tiles):
+        row = index // grid_size
+        column = index % grid_size
+        y = tile_side * row
+        x = tile_side * column
+        canvas[y : tile_side + y, x: tile_side + x] = tile
+
+    return canvas
+
+
+
+
+
+# Test Parameters:
+
+if  __name__ == "__main__":
+    path = "   "                 # <-- insert image path here
+    grid_size = 3                # change to 3, 4, or 5
+
+    img = load_image(path, grid_size)
+    print("load_image: ", img.shape)
+    cv2. imshow("load_image", img)
+
+    tiles = split_into_tiles(img, grid_size)
+    print("split_into_tiles:", len(tiles), tiles[0].shape)
+    cv2.imshow("tile 0", tiles[0])
+    cv2.imshow("tile 1", tiles[1])
+    cv2.imshow("tile 2", tiles[2])
+    cv2.imshow("tile 3", tiles[3])
+    cv2.imshow("tile 4", tiles[4])
+    cv2.imshow("tile 5", tiles[5])
+    cv2.imshow("tile 6", tiles[6])
+    cv2.imshow("tile 7", tiles[7])
+    cv2.imshow("tile 8", tiles[8])                    # 3x3 = 9
+    #cv2.imshow("tile 9", tiles[9])
+    #cv2.imshow("tile 10", tiles[10])
+    #cv2.imshow("tile 11", tiles[11])
+    #cv2.imshow("tile 12", tiles[12])
+    #cv2.imshow("tile 13", tiles[13])
+    #cv2.imshow("tile 14", tiles[14])
+    #cv2.imshow("tile 15", tiles[15])                  # remove '#' if grid size is 4x4 = 16
+    #cv2.imshow("tile 16", tiles[16])
+    #cv2.imshow("tile 17", tiles[17])
+    #cv2.imshow("tile 18", tiles[18])
+    #cv2.imshow("tile 19", tiles[19])
+    #cv2.imshow("tile 20", tiles[20])
+    #cv2.imshow("tile 21", tiles[21])
+    #cv2.imshow("tile 22", tiles[22])
+    #cv2.imshow("tile 23", tiles[23])
+    #cv2.imshow("tile 24", tiles[24])                  # remove '#' if grid size is 5x5 = 25
+    
+    before = tile.copy[0].copy()
+    rotated = rotate_tile(tiles[0], 90)
+    print("rotate_tile left original unchanged:", np.array_equal(before, tiles[0]))
+    cv2.imshow("rotated 90", rotated)
+
+    before = tile.copy[0].copy()
+    flipped = flip_tile(tiles[0], "horizontal")
+    print("rotate_tile left original unchanged:", np.array_equal(before, tiles[0]))
+    cv2.imshow("flipped horizontally", flipped)
+
+    rebuilt = assemble_tiles(tiles, grid_size)
+    print("asembled_round-trip matches original:" np.array_equal(rebuilt, img))
+    cv2.imshow("reassembled", rebuilt)
+
+
+for g in (3, 4, 5):
+    print(g. transform_count(g))
+
+# random.seed(0)                                  # remove '#' if needed.
+result = generate_transform(3)
+print(len(result))
+for instr in result:
+  print(instr)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
