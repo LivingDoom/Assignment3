@@ -269,7 +269,7 @@ def assemble_tiles(tiles, grid_size):
 
 if  __name__ == "__main__":
     path = "small_shapes.png"                 # <-- insert image path here
-    grid_size = 4                # change to 3, 4, or 5
+    grid_size = 3                # change to 3, 4, or 5
 
     # 1. Load
     img = load_image(path, grid_size)
