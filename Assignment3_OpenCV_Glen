@@ -98,6 +98,7 @@ def split_into_tiles(img, grid_size):
             y = tile_side * rows
             x = tile_side * columns
             tile = img[y : y + tile_side , x : x + tile_side].copy()
+            tiles.append(tile)
 
     return tiles
 
@@ -204,7 +205,7 @@ def generate_transform(grid_size):
     direction = random.choice(["horizontal", "vertical"])
     instructions.append({"type": "flip", "tile": tile, "value": direction})
 
-    tile_a. tile_b = random.sample(range(num_tiles), 2)
+    tile_a, tile_b = random.sample(range(num_tiles), 2)
     instructions.append({"swap": "flip", "tile": tile_a, "value": tile_b})
 
     for i in range(count - 3):
@@ -249,7 +250,7 @@ def generate_transform(grid_size):
 def assemble_tiles(tiles, grid_size):
     tile_side = tiles[0].shape[0]
     side = tile_side * grid_size
-    canvas = np.zeroes((side, side, 3), dtype = np.uint8)
+    canvas = np.zeros((side, side, 3), dtype = np.uint8)
 
     for index, tile in enumerate(tiles):
         row = index // grid_size
@@ -340,7 +341,7 @@ if  __name__ == "__main__":
 
 
 for g in (3, 4, 5):
-    print(g. transform_count(g))
+    print(transform_count(g))
 
 # random.seed(0)                                  # remove '#' if needed.
 result = generate_transform(3)
