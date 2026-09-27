@@ -238,12 +238,12 @@ puzzle.swap_tile(puzzle._tiles[0].current_position, puzzle._tiles[0].current_pos
 puzzle.flip_tile( 'vert', puzzle._tiles[2].current_position)
 print (puzzle.view_history())
 
-t = random.choice(puzzle._tiles)
-print(t)
+# t = random.choice(puzzle._tiles)
+# print(t)
 
-d = random.choice(['cw','ccw'])
-print(d)
+# d = random.choice(['cw','ccw'])
+# print(d)
 
-f = random.choice(['horz','vert'])
-print(f)
+# f = random.choice(['horz','vert'])
+# print(f)
 

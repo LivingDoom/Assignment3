@@ -2,7 +2,7 @@
 Software Now - Assignment3
 
 
-# Add Final Program name here
+# main.py
 
 Group Name: [DAN/EXT12] 
 Group Members:
