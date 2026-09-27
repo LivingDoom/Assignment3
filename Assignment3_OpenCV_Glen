@@ -270,10 +270,12 @@ if  __name__ == "__main__":
     path = "   "                 # <-- insert image path here
     grid_size = 3                # change to 3, 4, or 5
 
+    # 1. Load
     img = load_image(path, grid_size)
     print("load_image: ", img.shape)
     cv2. imshow("load_image", img)
 
+    # 2. Split
     tiles = split_into_tiles(img, grid_size)
     print("split_into_tiles:", len(tiles), tiles[0].shape)
     cv2.imshow("tile 0", tiles[0])
@@ -301,7 +303,8 @@ if  __name__ == "__main__":
     #cv2.imshow("tile 22", tiles[22])
     #cv2.imshow("tile 23", tiles[23])
     #cv2.imshow("tile 24", tiles[24])                  # remove '#' if grid size is 5x5 = 25
-    
+
+    # 3. Rotate/ Flip
     before = tile.copy[0].copy()
     rotated = rotate_tile(tiles[0], 90)
     print("rotate_tile left original unchanged:", np.array_equal(before, tiles[0]))
@@ -312,9 +315,28 @@ if  __name__ == "__main__":
     print("rotate_tile left original unchanged:", np.array_equal(before, tiles[0]))
     cv2.imshow("flipped horizontally", flipped)
 
+    # 4. Reassemle that mataches original (no transforms yet)
     rebuilt = assemble_tiles(tiles, grid_size)
     print("asembled_round-trip matches original:" np.array_equal(rebuilt, img))
     cv2.imshow("reassembled", rebuilt)
+
+    # 5. Scrammbled test
+    tiles[0] = rotate_tile(tiles[0], 90)
+    tiles[1] = flip_tile(tiles[1], "vertical")
+    tiles[2] = rotate_tile(tiles[2], 180)
+    tiles[3] = rotate_tile(tiles[3], 270)
+    tiles[4] = flip_tile(tiles[4], "horizontal")
+    tiles[5] = rotate_tile(tiles[5], 90)
+    tiles[6] = flip_tile(tiles[6], "vertical")
+    tiles[7] = flip_tile(tiles[7], "horizontal")
+    tiles[8] = rotate_tile(tiles[8], 180)
+
+    scrambled_image = assemble_tiles(tiles, grid_size)
+
+    cv2.imshow("original", img)
+    cv2.imshow("scrambled puzzle", scrambled_image)
+    
+    cv2.waitKey(0)
 
 
 for g in (3, 4, 5):
