@@ -87,7 +87,7 @@ def load_image(path, grid_size, target = 500):
                in row-major order (index 0 = top-left, last index = bottom right)
 
     NOTES:
-         This function does not check taht image side divides evenly by grid_size. If it doesn't, the extra pixels are silently dropped from the right/bottom of the image.
+         This function does not check that image side divides evenly by grid_size. If it doesn't, the extra pixels are silently dropped from the right/bottom of the image.
 """
 def split_into_tiles(img, grid_size):
     tile_side = img.shape[0] // grid_size
