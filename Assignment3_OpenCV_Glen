@@ -206,7 +206,7 @@ def generate_transform(grid_size):
     instructions.append({"type": "flip", "tile": tile, "value": direction})
 
     tile_a, tile_b = random.sample(range(num_tiles), 2)
-    instructions.append({"swap": "flip", "tile": tile_a, "value": tile_b})
+    instructions.append({"type": "swap", "tile": tile_a, "value": tile_b})
 
     for i in range(count - 3):
         transform_type = random.choice(["rotate", "flip", "swap"])
