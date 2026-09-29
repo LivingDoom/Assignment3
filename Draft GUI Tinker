@@ -1,0 +1,162 @@
+from __future__ import annotations
+import tkinter as tk
+from tkinter import ttk
+from tkinter import filedialog
+
+import os
+from PIL import Image, ImageTk
+
+class ImagePuzzleGame:
+
+    def __init__(self, window):
+# Main Window
+        self.window = window
+        self.window.title("Image Puzzle Window")
+        self.window.state("zoomed")
+
+# Selecting the image
+        self.selected_image = ""
+
+#Canvas area
+        self.canvas = tk.Canvas(self.window)
+        self.canvas.pack(fill='both', expand=True)
+        self.canvas.bind("<Configure>", self.resize_canvas)
+        self.create_widgets()
+
+#Draw boxes for each section
+    def resize_canvas(self, event):
+        width = event.width
+        height = event.height
+        self.canvas.delete("boxes")
+        self.canvas.delete("title")
+        self.canvas.delete("headings")
+
+        self.canvas.create_rectangle(5, 5, width - 5, 55, tags="boxes") #Top Box
+        self.canvas.create_text(width / 2, 30, text="***IMAGE PUZZLE GAME***", font=("Arial", 20, "bold"), fill="red", tags="title") #Title in centre of top box
+        self.canvas.create_rectangle(5, 55, width - 5, 150, tags="boxes")# Second Box
+        self.canvas.create_rectangle(5, 150, width / 2, height - 80, tags="boxes")# Third middle box left
+        self.canvas.create_text(width / 4, 165, text="Original Image", font=("Arial", 12), tags="headings")
+        self.canvas.create_rectangle(width / 2, 150, width - 5, height - 80, tags="boxes")# Third middle box right
+        self.canvas.create_text(width * 0.75, 165, text="Puzzle Image", font=("Arial", 12), tags="headings")
+        self.canvas.create_rectangle(5, height - 80, width - 5, height - 5, tags="boxes")# Bottom box
+
+        self.position_bottom_widgets()
+
+    def position_bottom_widgets(self):
+        width = self.canvas.winfo_width()
+        height = self.canvas.winfo_height()
+
+        x1 = width * 0.08
+        x2 = width * 0.25
+        x3 = width * 0.43
+        x4 = width * 0.65
+        x5 = width * 0.78
+        x6 = width * 0.92
+
+        label_y = height - 42
+        
+
+        self.status.place(x=x1, y=label_y, anchor="center")
+        self.moves.place(x=x2, y=label_y, anchor="center")
+        self.incorrect_tiles.place(x=x3, y=label_y, anchor="center")
+        self.hints_left.place(x=x4, y=label_y, anchor="center")
+        self.hint_button.place(x=x5, y=label_y, anchor="center")
+        self.solved_button.place(x=x6, y=label_y, anchor="center")
+
+    def create_widgets(self):
+#Open Image button
+        self.open_button = tk.Button(self.window, text="Open An Image From Your Files Here", font=("Arial", 12), fg="black", command=self.click_image)
+        self.open_button.place(x=50, y=85)
+
+#Chose Image
+        self.chose_image_label = tk.Label(self.window, text="You have chosen Image:", font=("Arial", 12))
+        self.chose_image_label.place(x=380, y=90)
+        self.image_entry = tk.Entry(self.window, width=25, font=("Arial", 12))
+        self.image_entry.place(x=560, y=90)
+
+#Grid size
+        self.grid_label = tk.Label(self.window, text="Choose Your Grid Size:", font=("Arial", 12))
+        self.grid_label.place(x=825, y=90)
+
+        self.grid_box = ttk.Combobox(self.window, values=["3 x 3", "4 x 4", "5 x 5"], width=15, font=("Arial", 12), state="readonly") 
+        self.grid_box.place (x=1000, y=90)
+        self.grid_box.current(0)
+
+#Image button
+        self.load_image_button = tk.Button(self.window, text="Load Image For Puzzle Game", font=("Arial", 12), fg="black", command=self.load_image)
+        self.load_image_button.place(x=1200, y=85)
+
+#Moves
+        self.moves = tk.Label(self.window, text="Number of Moves", font=("Arial", 12))
+
+#Incorrect tiles
+        self.incorrect_tiles = tk.Label(self.window, text="Number of Incorrect Tiles", font=("Arial", 12))
+       
+#Number of Hints left
+        self.hints_left = tk.Label(self.window, text="Hints Left", font=("Arial", 12))
+       
+#Hint Button
+        self.hint_button = tk.Button(self.window, text="Hints", font=("Arial", 14), fg="Red", command=self.hint)
+
+#Solved
+        self.solved_button = tk.Button(self.window, text="Solve", font=("Arial", 14), fg="green", command=self.solve)
+        
+#Status
+        self.status = tk.Label(self.window, text="Status:", font=("Arial", 12))
+
+#Open Image
+    def click_image(self):
+   
+        file_path = filedialog.askopenfilename(
+            title="choose an Image",
+            filetypes=[
+                ("Image files", "*.jpg *.jpeg *.png *.bmp"),
+                ("JPG files", "*.jpg *.jpeg"),
+                ("PNG files", "*.png"),
+                ("BMP files", "*.bmp")
+            ]
+        )
+        if file_path:
+            self.selected_image = file_path
+            image_name = os.path.basename(file_path) #The file name
+            self.image_entry.delete(0, tk.END)
+            self.image_entry.insert(0, image_name)
+#Load Image
+    def load_image(self):
+        if self.selected_image == "":
+            print("Please Choose an Image First.")
+            return
+        
+# Get grid size
+        grid_text = self.grid_box.get()
+        grid_size = int(grid_text.split(" ")[0])
+
+        print("Image:", self.selected_image)
+        print("Grid:", grid_size)
+
+        self.display_original_image()
+
+#Display of Image Left side
+    def display_original_image(self):
+        image = Image.open(self.selected_image)
+        max_width = 475
+        max_height = 260
+        image.thumbnail((max_width, max_height))
+        photo = ImageTk.PhotoImage(image)
+        self.canvas.original_photo = photo
+        width = self.canvas.winfo_width()
+        height = self.canvas.winfo_height()
+        x = width / 4
+        y = (195 + (height - 175)) / 2
+        self.canvas.create_image(x, y, image=photo, anchor="center")
+
+
+    def hint(self):
+        print("Hint button pressed")
+    def solve(self):
+        print("Solve button pressed")
+
+
+window = tk.Tk()
+game = ImagePuzzleGame(window)
+window.mainloop()
