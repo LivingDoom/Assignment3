@@ -1,28 +1,91 @@
-# OOP .py file for the all objects needed for to create the puzzle game.
-import cv2
+"""
+puzzle_oop.py
+=============
+OOP core of the tile-puzzle game (HIT137 Group Assignment 3).
+
+BIG PICTURE
+-----------
+    OpenCV part  -->  list of tile images  -->  Puzzle  -->  many Tile objects
+                                                  |
+                                                  +-- uses Transform objects (Rotate / Flip / Swap)
+                                                      to change the tiles
+
+    * Tile      - one piece of the picture. Knows only about ITSELF (where it is,
+                  how it is turned/flipped, its pixels). Never draws anything.
+    * Transform - base class for one action on tile(s). Subclasses Rotate, Flip
+                  and Swap each implement apply(). Puzzle calls apply() without
+                  caring which subclass it holds (polymorphism).
+    * Puzzle    - owns all the Tiles, performs and records the player's moves,
+                  scrambles the board and tracks whether it is solved.
+
+QUICK START (what the GUI / other modules call)
+-----------------------------------------------
+    puzzle = Puzzle(tile_images, grid)               # tile_images: list of grid*grid numpy arrays
+    puzzle.scramble()                                # call ONCE straight after creating the puzzle
+    puzzle.rotate_tile((1, 2))                       # right click       -> rotate 90 deg clockwise
+    puzzle.flip_tile('horizontal', (1, 2))           # shift + left click -> flip
+    puzzle.swap_tile((0, 0), (2, 1))                 # second left click  -> swap two tiles
+
+POSITIONS
+---------
+A position is always a (row, col) tuple, (0, 0) = top-left. When you pass a
+position to a Puzzle method it means "the tile that is CURRENTLY sitting
+there on the board", not "the tile that started there".
+
+READING STATE FROM OTHER MODULES (read only - never assign to these)
+--------------------------------------------------------------------
+    puzzle._solved          True once every tile is correct (input is then refused)
+    puzzle._moves           number of player moves so far (scramble moves do not count)
+    puzzle._tiles           list of Tile objects (list order never changes;
+                            use each tile's current_position to know where it is drawn)
+    puzzle.view_history()   list of the player's moves, oldest first
+"""
+import cv2      # only used by the test block at the bottom for now (image drawing code will need it later)
 import random
 import numpy as np
 
-pic = cv2.imread("small_shapes.png")
-
-if pic is None:
-    raise FileNotFoundError("Could not load small_shapes.png")
-
-snippet = pic[100:200, 100:200]
-
-class Winner(Exception):
-    """Raised when the puzzle is solved."""
 
 class PositionValueError(Exception):
-    """Raise error for position no found"""
+    """Raised when no tile is found at a position that was passed in
+    (e.g. a (row, col) that is off the board)."""
+
 
 class Tile():
-    
-    def __init__(self, original_position, image) -> None:
-        
+    """One piece of the puzzle.
 
+    A Tile only knows about ITSELF: where it started, where it is now, how it
+    is turned/flipped, and its slice of the picture. It never looks at other
+    tiles and never draws anything. Change its state through its methods,
+    normally via a Transform object (see below).
+
+    Attributes:
+        original_position:    (row, col) where the tile belongs in the solved
+                              picture. Never changes.
+        current_position:     (row, col) where the tile currently sits on the
+                              board. Changed by Swap.
+        original_orientation: always 0 (solved = upright).
+        current_orientation:  0, 90, 180 or 270 degrees, clockwise.
+        _flipped_vert:        True if the tile is flipped vertically (internal).
+        _flipped_horz:        True if the tile is flipped horizontally (internal).
+        _is_correct:          result of the last check_is_correct() call (internal).
+                              Refreshed by Puzzle.check(); the GUI can use it to
+                              decide which tiles get a green tick.
+        _image:               numpy array of this tile's pixels exactly as cut
+                              from the picture (internal). The Tile stores it but
+                              never edits it - whoever draws the board applies the
+                              flips / rotation described by the attributes above.
+                              NOTE: the order to apply them in (flip, then rotate)
+                              still needs agreeing with the OpenCV / GUI members.
+    """
+
+    def __init__(self, original_position, image) -> None:
+        """
+        Args:
+            original_position: (row, col) home of this tile in the solved picture.
+            image: numpy array (the pixels for this tile).
+        """
         self.original_position = original_position
-        self.current_position = original_position
+        self.current_position = original_position   # starts solved, scramble moves it later
         self.original_orientation = 0        # 0
         self.current_orientation = 0         # 0, 90, 180, 270
         self._flipped_vert = False
@@ -31,111 +94,190 @@ class Tile():
         self._image = image
 
     def __str__(self) -> str:
+        # Short, human-readable version (used by print(tile)).
         return( f"Original position: {self.original_position}\n"
                 # f"Current position: {self.current_position}\n"
                 # f"Original orientation: {self.original_orientation}\n"
                 # f"Current orientation: {self.current_orientation}\n"
                 # f"Flipped horizontally: {self._flipped_horz}\n"
                 # f"Flipped vertically: {self._flipped_vert}\n"
-               )       
+               )
 
     def __repr__(self) -> str:
+        # Full debug dump of the tile's state (used when printing a list of tiles).
         return( f"Original position: {self.original_position}\n"
                 f"Current position: {self.current_position}\n"
                 f"Original orientation: {self.original_orientation}\n"
                 f"Current orientation: {self.current_orientation}\n"
                 f"Flipped horizontally: {self._flipped_horz}\n"
-                f"Flipped vertically: {self._flipped_vert}\n"
+                f"Flipped vertically: {self._flipped_vert}\n\n"
               )
-    
+
 
     # Rotation ============================================================
-    def rotate(self, direction):
-        if direction not in ('cw', 'ccw'):
-            raise ValueError(f"{direction} is not a valid input, use cw or ccw for rotation input")
-        step = 90 if direction == 'cw' else -90
-        self.current_orientation = (self.current_orientation + step)% 360
+    def rotate(self):
+        """Rotate the tile 90 degrees clockwise.
+
+        The orientation wraps around: 0 -> 90 -> 180 -> 270 -> 0.
+        Returns the new orientation in degrees.
+        """
+        self.current_orientation = (self.current_orientation + 90)% 360
         return self.current_orientation
 
-
-    # Flipping =============================================================   
+    # Flipping =============================================================
     def flip_vert(self):
+        """Toggle the vertical flip (flipping twice puts it back). Returns nothing."""
         self._flipped_vert = not self._flipped_vert
+
     def flip_horz(self):
+        """Toggle the horizontal flip (flipping twice puts it back). Returns nothing."""
         self._flipped_horz = not self._flipped_horz
 
     # Checks ===============================================================
     def check_is_correct(self):
+        """Is this tile in its solved state?
+
+        Correct means ALL of: back at its original position, orientation 0,
+        and not flipped in either direction. Stores the answer in
+        self._is_correct and also returns it (True / False).
+        """
         if self.original_orientation == self.current_orientation and self.original_position == self.current_position and self._flipped_horz == False and self._flipped_vert == False:
             self._is_correct = True
             return self._is_correct
         else:
             self._is_correct = False
             return self._is_correct
-        
+
 
 class Puzzle:
-    # This is the section where OpenCV's split up image will come into the function.
-    # CreateImage class below is what i was aiming to make the images from, then pass it into this class.
+    """The whole board: owns every Tile and coordinates everything that happens to them.
 
-    def __init__(self, image_list: list[np.ndarray], grid: int): 
+    Rotate / Flip / Swap classes are defined further down this file. That is
+    fine: Python only looks those names up when a method actually runs.
+
+    Attributes (all internal, see the module docstring for what to read):
+        _grid:         tiles per side (3, 4 or 5).
+        _tiles:        list of Tile objects. The LIST ORDER NEVER CHANGES
+                       (row-major from the original picture); a tile's place on
+                       the board is its current_position.
+        _moves:        number of player moves (rotate, flip or swap each = 1).
+        _move_history: list of Transform objects for the player's moves.
+        _solved:       True when every tile is correct. Once True, the move
+                       methods refuse further input.
+    """
+
+    def __init__(self, image_list: list[np.ndarray], grid: int):
+        """Build one Tile per image.
+
+        Args:
+            image_list: flat list of numpy arrays in row-major order
+                        (index 0 = top-left, then along the top row, then the
+                        next row down...). Must hold grid * grid images
+                        (this is not checked).
+            grid: tiles per side - 3, 4 or 5.
+        """
         self._grid = grid
         self._tiles = []
         self._moves = 0
         self._move_history = []
-        self._correct_list = []
-        
+        self._solved = False
+
+        # Turn each image's list index into a (row, col) position:
+        # row = index // grid, col = index % grid   e.g. grid 3, index 7 -> (2, 1)
         output = enumerate(image_list)
         for index, image in output:
             row = index // self._grid
             col = index % self._grid
             self._tiles.append(Tile((row,col),image))
 
-        # print(self._tiles)
-        # for i in self._tiles:
-        #     print(repr(i))
-        # self.check()
+        print(f"Grid size: {grid}")                                 # Remove when submitting.
 
     def __str__(self) -> str:
         return f"Current Moves: {self._moves}"
-        
-    def check(self):
-        # all() checks True for each item in an iterator supplied, and returns True if all are True.
-        return all(tile.check_is_correct() for tile in self._tiles)
 
-    def rotate_tile(self, direction, position):
+    def check(self):
+        """Refresh every tile's correctness flag and update self._solved.
+
+        Returns nothing - read puzzle._solved afterwards.
+        A list (square brackets) is built on purpose: all() stops at the first
+        False, so with a generator the tiles after it would never be re-checked
+        and their _is_correct flags (used for the green ticks) would go stale.
+        """
+        # all() checks True for each item in an iterator supplied, and returns True if all are True.
+        self._solved = all([tile.check_is_correct() for tile in self._tiles])
+
+    def trans_helper(self, transformation):
+        """INTERNAL. The shared last step of every player move.
+
+        Applies the transformation, records it in the history, counts the move
+        and re-checks the puzzle. rotate_tile / flip_tile / swap_tile all end
+        by calling this, so every move is applied, logged, counted and checked
+        in exactly one place. (If apply() raises, nothing is logged or counted.)
+        Returns the transformation.
+        """
+        transformation.apply()
+        self._move_history.append(transformation)
+        self._moves += 1
+        self.check()
+        return transformation
+
+    def rotate_tile(self, position):
+        """Player move: rotate the tile at `position` 90 degrees clockwise.
+
+        Returns the Rotate object, or None if the puzzle is already solved
+        (nothing happens and no move is counted).
+        Raises PositionValueError if no tile is at `position`.
+        """
         tile = None
+        if self._solved is True:            # solved -> refuse all further input
+            return None
+        # Look up which Tile is currently sitting at `position`.
+        # (We must search: the _tiles list never reorders when tiles are swapped.)
         for t in self._tiles:
             if t.current_position == position:
                 tile = t
                 break
         if tile is None:
             raise PositionValueError(f"Tile at position {position}")
-        
-        transformation = Rotate(direction, tile)
-        transformation.apply()
-        self._move_history.append(transformation)
-        self._moves += 1
-        return transformation
+
+        transformation = Rotate(tile)
+        return self.trans_helper(transformation)
 
     def flip_tile(self, direction, position):
-            tile = None
-            for t in self._tiles:
-                if t.current_position == position:
-                    tile = t
-                    break
-            if tile is None:
-                raise PositionValueError(f"Tile at position {position}")
-            
-            transformation = Flip(direction, tile)
-            transformation.apply()
-            self._move_history.append(transformation)
-            self._moves += 1
-            return transformation
-    
+        """Player move: flip the tile at `position`.
+
+        Args:
+            direction: 'horizontal' or 'vertical' (anything else raises ValueError).
+            position: (row, col) of the tile as it currently sits on the board.
+        Returns the Flip object, or None if the puzzle is already solved.
+        Raises PositionValueError if no tile is at `position`.
+        """
+        tile = None
+        if self._solved is True:
+            return None
+        for t in self._tiles:
+            if t.current_position == position:
+                tile = t
+                break
+        if tile is None:
+            raise PositionValueError(f"Tile at position {position} is None (inside flip_tile)")
+
+        transformation = Flip(direction, tile)
+        return self.trans_helper(transformation)
+
     def swap_tile(self, first_pos, second_pos):
+        """Player move: swap the tiles currently at two board positions.
+
+        Args:
+            first_pos, second_pos: (row, col) positions on the board.
+        Returns the Swap object, or None if the puzzle is already solved.
+        Raises PositionValueError if either position has no tile.
+        """
         tile = None
         tile2 = None
+        if self._solved is True:
+            return None
+        # Two separate searches (one per position), one break each.
         for t in self._tiles:
             if t.current_position == first_pos:
                 tile = t
@@ -148,66 +290,126 @@ class Puzzle:
             raise PositionValueError(f"Tile at position {first_pos}")
         elif tile2 is None:
             raise PositionValueError(f"Tile at position {second_pos}")
-        
+
         transformation = Swap(tile, tile2)
-        transformation.apply()
-        self._move_history.append(transformation)
-        self._moves += 1
-        return transformation
+        return self.trans_helper(transformation)
 
-    def scramble(self, count):
+
+    def scramble(self):
+        """Randomly transform the board at the start of a game.
+
+        Call ONCE, right after creating the Puzzle. Applies grid * (grid + 3)
+        random Rotate / Flip / Swap transformations directly with .apply(),
+        so they are NOT added to the move history and do NOT count as moves.
+        Finishes with check() so _solved and the per-tile flags are up to date.
+        The print lines are debug output - remove before submitting.
+
+        KNOWN ISSUE: the assignment gives the player only ONE flip (horizontal),
+        but this method can also flip tiles VERTICALLY. A tile left vertically
+        flipped can never be undone by the player, so the puzzle may be
+        impossible to solve. This needs fixing and I'm thinking of taking vertical 
+        flips as the istructions stipulates "Flip – a tile is flipped horizontally 
+        or vertically." Keyword OR not AND.
+        """
+        count = 0
+        for i in range((self._grid * (self._grid + 3))):
+            i = random.choice(['rotate', 'flip', 'swap'])     # which kind of transformation
+            count += 1
+            print(f"{count}: {i}")
+            if i == 'rotate':
+                transformation = Rotate(random.choice(self._tiles))
+                transformation.apply()
+            elif i == 'flip':
+                transformation = Flip(random.choice(['vertical','horizontal']),random.choice(self._tiles))
+                transformation.apply()
+            elif i == 'swap':
+                # Both tiles are picked independently, so a tile can be "swapped
+                # with itself" - harmless, it simply does nothing.
+                transformation = Swap(random.choice(self._tiles),random.choice(self._tiles))
+                transformation.apply()
+        self.check()
+
+    def Solve(self):
+        """TODO: instantly solve the puzzle and clear the moves and score.
+        Should finish with self.check() so _solved becomes True."""
         pass
-    
-    def view_history(self) -> list:
-        return self._move_history
-        
 
+    def view_history(self) -> list:
+        """Return the player's moves (Transform objects), oldest first.
+        This is the real list, not a copy - treat it as read only."""
+        return self._move_history
+
+
+# Grid sizes the player can choose from.
 small_grid = 3
 medium_grid = 4
 large_grid = 5
 
-# To reach inner objects in Puzzle._tiles list: 
-# puzzle._tiles[0].rotate('cw') will change the rotate value, etc... 
-# access Obj Name -> method/data type inside the puzzle -> the method/data type inside Tile class 
-# as it's being created by puzzle -> then assign/change/view the value accordingly.
 
-
+# =============================================================================
+# TRANSFORMS
+# Each one wraps a single action on tile(s). Build it with the tile object(s)
+# to act on, then call .apply(). Building a Transform does nothing by itself.
+# Transforms never log or count moves - only Puzzle's *_tile methods do that
+# (that is why scramble() can use them without affecting the move count).
+# =============================================================================
 class Transform:
+    """Base class. Every subclass must override apply()."""
+
     def __init__(self) -> None:
         ...
-    
+
     def apply(self):
+        """Perform the action. Subclasses must implement this."""
         raise NotImplementedError
 
+
 class Rotate(Transform):
-    def __init__(self, direction, tile) -> None:
+    """Rotate one tile 90 degrees clockwise."""
+
+    def __init__(self, tile) -> None:
+        """Args: tile - the Tile object (not a position) to rotate."""
         super().__init__()
-        self.direction = direction
         self.tile = tile
 
     def __repr__(self) -> str:
-        return f"Rotate({self.direction}, tile at {self.tile.current_position})"
-    
+        return f"Rotated tile at {self.tile.current_position}"
+
     def apply(self):
-        return self.tile.rotate(self.direction)
+        """Rotate the tile. Returns the tile's new orientation in degrees."""
+        return self.tile.rotate()
+
 
 class Flip(Transform):
+    """Flip one tile horizontally or vertically."""
+
     def __init__(self, function, tile) -> None:
+        """
+        Args:
+            function: 'horizontal' or 'vertical'.
+            tile: the Tile object (not a position) to flip.
+        """
         super().__init__()
         self.function = function
         self.tile = tile
 
     def __repr__(self) -> str:
-        return f"Fliped the tile {self.function} at {self.tile.current_position}"
-    
+        return f"Flipped the tile {self.function} at {self.tile.current_position}"
+
     def apply(self):
-        if self.function not in ('horz','vert'):
-            raise ValueError(f"Incorrect flip direction given. Use 'horz' of 'vert' only.")
-        result = self.tile.flip_horz() if self.function == 'horz' else self.tile.flip_vert()
+        """Flip the tile. Raises ValueError for any other direction string.
+        Returns None (the Tile flip methods return nothing)."""
+        if self.function not in ('horizontal','vertical'):
+            raise ValueError(f"Incorrect flip direction given. Use 'horizontal' or 'vertical' only.")
+        result = self.tile.flip_horz() if self.function == 'horizontal' else self.tile.flip_vert()
         return result
-        
-class Swap(Transform): 
+
+
+class Swap(Transform):
+    """Exchange the board positions of two tiles."""
+
     def __init__(self, first_tile, second_tile) -> None:
+        """Args: first_tile, second_tile - Tile objects (not positions)."""
         super().__init__()
         self.first_tile = first_tile
         self.second_tile = second_tile
@@ -216,34 +418,59 @@ class Swap(Transform):
         return f"Swapped {self.first_tile.current_position} tile with {self.second_tile.current_position} "
 
     def apply(self):
+        """Swap the two tiles' current_position values.
+        Returns (position1, position2) as they were BEFORE the swap.
+        Note: the swap logic lives here, not in Tile, because Tile is not
+        meant to know about other tiles."""
         position1 = self.first_tile.current_position
         position2 = self.second_tile.current_position
         self.first_tile.current_position = position2
         self.second_tile.current_position = position1
         return position1, position2
 
+
+# Placeholder, not used. Loading, resizing and cutting the image is done by the
+# OpenCV module (load_image, split_into_tiles).
 class CreateImage:
     def __init__(self) -> None:
         pass
 
 
+# =============================================================================
+# SCRATCH TESTING - only runs when this file is executed directly
+# (oop.py), NOT when another module imports it.
+# =============================================================================
+if __name__ == "__main__":
+    path = "small_shapes.png"
+    pic = cv2.imread(path)
 
-puzzle = Puzzle(snippet, large_grid)
-puzzle._tiles[0].rotate('cw')
-print(puzzle.check())
-puzzle._tiles[0].rotate('ccw')
-print(puzzle.check())
-puzzle.rotate_tile('ccw', (0,0))
-puzzle.swap_tile(puzzle._tiles[0].current_position, puzzle._tiles[0].current_position)
-puzzle.flip_tile( 'vert', puzzle._tiles[2].current_position)
-print (puzzle.view_history())
+    if pic is None:
+        raise FileNotFoundError(f"Could not load {path}")
 
-# t = random.choice(puzzle._tiles)
-# print(t)
+    # Placeholder data: a 25x25 pixel crop is treated as a list of 25 "tiles"
+    # (one per pixel row) just to exercise the classes. Real tiles come from
+    # the OpenCV part's split_into_tiles().
+    snippet = pic[100:125, 100:125]
+    print(snippet.shape)
 
-# d = random.choice(['cw','ccw'])
-# print(d)
+    puzzle = Puzzle(snippet, large_grid)
+    puzzle.check()
+    print([t._is_correct for t in puzzle._tiles])
 
-# f = random.choice(['horz','vert'])
-# print(f)
+    # A brand-new puzzle counts as solved, so the moves below are refused until
+    # scramble() has been called.
+    # puzzle.scramble()
+    puzzle.rotate_tile((0,0))
+    puzzle.rotate_tile((0,0))
+    puzzle.rotate_tile((0,0))
+    puzzle.check()
+    print([t._is_correct for t in puzzle._tiles])
 
+    # print(puzzle._tiles)
+    # print([t._is_correct for t in puzzle._tiles])
+
+    # ic2(puzzle.check())
+    # puzzle.rotate_tile((0,0))
+    # puzzle.swap_tile(puzzle._tiles[0].current_position, puzzle._tiles[2].current_position)
+    # puzzle.flip_tile( 'vertical', puzzle._tiles[2].current_position)
+    print(puzzle.view_history())
