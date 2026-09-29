@@ -33,29 +33,49 @@ class ImagePuzzleGame:
 
         self.canvas.create_rectangle(5, 5, width - 5, 55, tags="boxes") #Top Box
         self.canvas.create_text(width / 2, 30, text="***IMAGE PUZZLE GAME***", font=("Arial", 20, "bold"), fill="red", tags="title") #Title in centre of top box
-        self.canvas.create_rectangle(5, 55, width - 5, 150, tags="boxes")# Second Box
-        self.canvas.create_rectangle(5, 150, width / 2, height - 80, tags="boxes")# Third middle box left
-        self.canvas.create_text(width / 4, 165, text="Original Image", font=("Arial", 12), tags="headings")
-        self.canvas.create_rectangle(width / 2, 150, width - 5, height - 80, tags="boxes")# Third middle box right
-        self.canvas.create_text(width * 0.75, 165, text="Puzzle Image", font=("Arial", 12), tags="headings")
+        self.canvas.create_rectangle(5, 55, width - 5, 130, tags="boxes")# Second Box
+        self.canvas.create_rectangle(5, 130, width / 2, height - 80, tags="boxes")# Third middle box left
+        self.canvas.create_text(width / 4, 155, text="Original Image", font=("Arial", 14), tags="headings")
+        self.canvas.create_rectangle(width / 2, 130, width - 5, height - 80, tags="boxes")# Third middle box right
+        self.canvas.create_text(width * 0.75, 155, text="Puzzle Image", font=("Arial", 14), tags="headings")
         self.canvas.create_rectangle(5, height - 80, width - 5, height - 5, tags="boxes")# Bottom box
 
+        self.position_top_widgets()
         self.position_bottom_widgets()
+
+    def position_top_widgets(self):
+        width = self.canvas.winfo_width()
+        height = self.canvas.winfo_height()
+
+        xa = width * 0.12
+        xb = width * 0.30
+        xc = width * 0.44
+        xd = width * 0.62
+        xe = width * 0.735
+        xf = width * 0.90
+
+        top_label_y = height - 702
+
+        self.open_button.place(x=xa, y=top_label_y, anchor="center")
+        self.chose_image_label.place(x=xb, y=top_label_y, anchor="center")
+        self.image_entry.place(x=xc, y=top_label_y, anchor="center")
+        self.grid_label.place(x=xd, y=top_label_y, anchor="center")
+        self.grid_box.place(x=xe, y=top_label_y, anchor="center")
+        self.load_image_button.place(x=xf, y=top_label_y, anchor="center")
 
     def position_bottom_widgets(self):
         width = self.canvas.winfo_width()
         height = self.canvas.winfo_height()
 
-        x1 = width * 0.08
+        x1 = width * 0.05
         x2 = width * 0.25
-        x3 = width * 0.43
+        x3 = width * 0.45
         x4 = width * 0.65
-        x5 = width * 0.78
-        x6 = width * 0.92
+        x5 = width * 0.80
+        x6 = width * 0.95
 
         label_y = height - 42
-        
-
+       
         self.status.place(x=x1, y=label_y, anchor="center")
         self.moves.place(x=x2, y=label_y, anchor="center")
         self.incorrect_tiles.place(x=x3, y=label_y, anchor="center")
@@ -66,41 +86,26 @@ class ImagePuzzleGame:
     def create_widgets(self):
 #Open Image button
         self.open_button = tk.Button(self.window, text="Open An Image From Your Files Here", font=("Arial", 12), fg="black", command=self.click_image)
-        self.open_button.place(x=50, y=85)
-
 #Chose Image
         self.chose_image_label = tk.Label(self.window, text="You have chosen Image:", font=("Arial", 12))
-        self.chose_image_label.place(x=380, y=90)
         self.image_entry = tk.Entry(self.window, width=25, font=("Arial", 12))
-        self.image_entry.place(x=560, y=90)
-
+        
 #Grid size
         self.grid_label = tk.Label(self.window, text="Choose Your Grid Size:", font=("Arial", 12))
-        self.grid_label.place(x=825, y=90)
-
         self.grid_box = ttk.Combobox(self.window, values=["3 x 3", "4 x 4", "5 x 5"], width=15, font=("Arial", 12), state="readonly") 
-        self.grid_box.place (x=1000, y=90)
         self.grid_box.current(0)
-
 #Image button
         self.load_image_button = tk.Button(self.window, text="Load Image For Puzzle Game", font=("Arial", 12), fg="black", command=self.load_image)
-        self.load_image_button.place(x=1200, y=85)
-
 #Moves
-        self.moves = tk.Label(self.window, text="Number of Moves", font=("Arial", 12))
-
+        self.moves = tk.Label(self.window, text="Number of Moves:", font=("Arial", 12))
 #Incorrect tiles
-        self.incorrect_tiles = tk.Label(self.window, text="Number of Incorrect Tiles", font=("Arial", 12))
-       
+        self.incorrect_tiles = tk.Label(self.window, text="Number of Incorrect Tiles:", font=("Arial", 12))
 #Number of Hints left
-        self.hints_left = tk.Label(self.window, text="Hints Left", font=("Arial", 12))
-       
+        self.hints_left = tk.Label(self.window, text="Hints Left:", font=("Arial", 12))
 #Hint Button
         self.hint_button = tk.Button(self.window, text="Hints", font=("Arial", 14), fg="Red", command=self.hint)
-
 #Solved
         self.solved_button = tk.Button(self.window, text="Solve", font=("Arial", 14), fg="green", command=self.solve)
-        
 #Status
         self.status = tk.Label(self.window, text="Status:", font=("Arial", 12))
 
