@@ -43,6 +43,7 @@ READING STATE FROM OTHER MODULES (read only - never assign to these)
 import cv2      # only used by the test block at the bottom for now (image drawing code will need it later)
 import random
 import numpy as np
+from OCV import *
 
 
 class PositionValueError(Exception):
@@ -133,6 +134,16 @@ class Tile():
         """Toggle the horizontal flip (flipping twice puts it back). Returns nothing."""
         self._flipped_horz = not self._flipped_horz
 
+    # Solve ================================================================
+    def revert(self):
+        self.current_position = self.original_position
+        self.current_orientation = 0         
+        self._flipped_vert = False
+        self._flipped_horz = False
+        self._is_correct = True
+        return self.current_position, self.current_orientation, self._flipped_vert, self._flipped_horz, self._is_correct
+
+    
     # Checks ===============================================================
     def check_is_correct(self):
         """Is this tile in its solved state?
@@ -190,7 +201,7 @@ class Puzzle:
             col = index % self._grid
             self._tiles.append(Tile((row,col),image))
 
-        print(f"Grid size: {grid}")                                 # Remove when submitting.
+        # print(f"Grid size: {grid}")                                 # Remove when submitting.
 
     def __str__(self) -> str:
         return f"Current Moves: {self._moves}"
@@ -294,6 +305,16 @@ class Puzzle:
         transformation = Swap(tile, tile2)
         return self.trans_helper(transformation)
 
+    def solve(self):
+            """Instantly solve the puzzle and clear the moves and score.
+            Finishes with self.check() so _solved becomes True."""
+            for tile in self._tiles:
+                transformation = tile.revert()
+            self._move_history = []
+            self._moves = 0
+            self.check()
+            
+            
 
     def scramble(self):
         """Randomly transform the board at the start of a game.
@@ -320,7 +341,7 @@ class Puzzle:
                 transformation = Rotate(random.choice(self._tiles))
                 transformation.apply()
             elif i == 'flip':
-                transformation = Flip(random.choice(['vertical','horizontal']),random.choice(self._tiles))
+                transformation = Flip(('horizontal'),random.choice(self._tiles))
                 transformation.apply()
             elif i == 'swap':
                 # Both tiles are picked independently, so a tile can be "swapped
@@ -328,11 +349,6 @@ class Puzzle:
                 transformation = Swap(random.choice(self._tiles),random.choice(self._tiles))
                 transformation.apply()
         self.check()
-
-    def Solve(self):
-        """TODO: instantly solve the puzzle and clear the moves and score.
-        Should finish with self.check() so _solved becomes True."""
-        pass
 
     def view_history(self) -> list:
         """Return the player's moves (Transform objects), oldest first.
@@ -429,11 +445,109 @@ class Swap(Transform):
         return position1, position2
 
 
-# Placeholder, not used. Loading, resizing and cutting the image is done by the
-# OpenCV module (load_image, split_into_tiles).
+# Loads and resizes and cuts the image. 
+
 class CreateImage:
-    def __init__(self) -> None:
-        pass
+    def __init__(self, path, grid_size, target = 500) -> None:
+        self.grid_size = grid_size
+        self._image = load_image(path, grid_size, target)
+
+    def get_image(self):
+        return self._image
+
+    def get_tiles(self):
+        return split_into_tiles(self._image, self.grid_size)
+
+
+
+""" 
+    Makes loaded image into a square by stretching/shrinking.
+
+    Parameters:
+        img: (numpy.ndarray) image loaded in.
+        
+    Returns:
+        numpy.ndarray: a new square image. the side equals the shorter side of the input. 
+"""
+def make_square_img(img):
+    height, width = img.shape[:2]
+    side = max(height, width)
+
+    return cv2.resize(img, (side, side))
+
+
+
+
+""" 
+    Load an image and prepare it for the puzzle.
+    Image is stretched/shrunk into a square, then resized so the side divides evenly into the grid.
+    
+    Parameters:
+        path: (str) File path to image. 
+        grid_size: (int) tiles per side, 3 means 3x3, 4 means 4x4, 5 means 5x5
+        target: (int) approximate side length in pixels.
+                      the actual side may be smaller, as it is rounded down to a multiple of grid size.
+    
+    Returns:
+        numpy.ndarray: returns a square image using above function.
+                       returned image still in BGR, need to convert to RGB.
+    
+    Errors:
+        FileNotFoundError: file could not be opened, either bad path, or file not an image.
+        ValueError: image too small for chosen grid size.
+
+    NOTES:
+        TODO: 'target = 500' needs to be change. depends on window size, confirm with Jono.
+        TODO: need exact square pixel size for 'Original image' and 'Puzzle image' windows from picture sent by Jono
+"""
+def load_image(path, grid_size, target = 500):
+    img  = cv2.imread(path)
+
+    if img is None:
+        raise FileNotFoundError("File could not be opened. Try different file.")
+
+    img = make_square_img(img)
+
+    min_tile = 10                                                                        # TODO: needs to bu tuned
+    side = img.shape[0]
+    if side < grid_size * min_tile:
+        raise ValueError("Image too small try larger imag or smaller grid.")
+
+    new_side = target // grid_size * grid_size
+
+    img = cv2.resize(img, (new_side, new_side))
+
+    return img
+
+
+
+"""
+    Cuts the square image into tiles based on grid size selected.
+
+    Parameters:
+        img: (numpy.ndarray) the cropped square loaded image. easily divisible.
+        grid_size: (int) grid size selected. 3x3, 4x4, 5x5
+
+    Returns:
+        tiles: a list of grid_size * grid_size tiles of the image.
+               in row-major order (index 0 = top-left, last index = bottom right)
+
+    NOTES:
+         This function does not check that image side divides evenly by grid_size. If it doesn't, the extra pixels are silently dropped from the right/bottom of the image.
+"""
+def split_into_tiles(img, grid_size):
+    tile_side = img.shape[0] // grid_size
+    tiles = []
+
+    for rows in range(grid_size):
+        for columns in range(grid_size):
+            y = tile_side * rows
+            x = tile_side * columns
+            tile = img[y : y + tile_side , x : x + tile_side].copy()
+            tiles.append(tile)
+
+    return tiles
+
 
 
 # =============================================================================
@@ -454,7 +568,7 @@ if __name__ == "__main__":
     print(snippet.shape)
 
     puzzle = Puzzle(snippet, large_grid)
-    puzzle.check()
+    # puzzle.check()
     print([t._is_correct for t in puzzle._tiles])
 
     # A brand-new puzzle counts as solved, so the moves below are refused until
@@ -463,14 +577,15 @@ if __name__ == "__main__":
     puzzle.rotate_tile((0,0))
     puzzle.rotate_tile((0,0))
     puzzle.rotate_tile((0,0))
-    puzzle.check()
     print([t._is_correct for t in puzzle._tiles])
 
     # print(puzzle._tiles)
     # print([t._is_correct for t in puzzle._tiles])
 
-    # ic2(puzzle.check())
     # puzzle.rotate_tile((0,0))
     # puzzle.swap_tile(puzzle._tiles[0].current_position, puzzle._tiles[2].current_position)
     # puzzle.flip_tile( 'vertical', puzzle._tiles[2].current_position)
+    puzzle.solve()
+    print([t._is_correct for t in puzzle._tiles])
     print(puzzle.view_history())
+    

@@ -30,7 +30,7 @@ def make_square_img(img):
 
 
 
-    """ 
+""" 
     Load an image and prepare it for the puzzle.
     Image is stretched/shrunk into a square, then resized so the side divides evenly into the grid.
     
@@ -338,6 +338,7 @@ if  __name__ == "__main__":
     cv2.imshow("scrambled puzzle", scrambled_image)
     
     cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
 for g in (3, 4, 5):
