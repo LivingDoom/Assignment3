@@ -24,7 +24,7 @@ class User_moves():
         self.selected_tile = None
 
     def check_tile_status(self, tile):
-        """Checks if a single tile matches its goal state and draws/removes the tick."""
+        #Checks if tile matches to goal state and draws/removes the tick
         info = tile.grid_info()
         
         is_correct_pos = (int(info['row']) == tile.goal_row and int(info['column']) == tile.goal_col)
@@ -62,7 +62,7 @@ class User_moves():
             info1 = self.selected_tile.grid_info()
             info2 = clicked_tile.grid_info()
             
-            # Swap tile positions
+            #Swap tile positions
             self.selected_tile.grid(row=info2['row'], column=info2['column'])
             clicked_tile.grid(row=info1['row'], column=info1['column'])
             
