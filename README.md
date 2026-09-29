@@ -18,101 +18,226 @@ Group Members:
 
 
 import cv2
-import numpy as np
 import random
 import tkinter as tk
+import numpy as np
 from PIL import Image, ImageTk
 
 
+IMAGE_CACHE = {}
 
-def make_square_img(img):
-    height, width = img.shape[:2]
-    side = max(height, width)
-    return cv2.resize(img, (side, side))
-
-
-def load_image(path, grid_size, target=450): # 450 divides cleanly by 3, 5
-    img = cv2.imread(path)
-    if img is None:
-        # Fallback dummy image if file doesn't exist so the GUI still runs
-        img = np.zeros((450, 450, 3), dtype=np.uint8)
-        cv2.putText(img, "Puzzle Image", (50, 225), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
-    
-    img = make_square_img(img)
-    new_side = (target // grid_size) * grid_size
-    img = cv2.resize(img, (new_side, new_side))
-    return img
+class Winner(Exception):
+    """Raised when the puzzle is solved."""
 
 
-def split_into_tiles(img, grid_size):
-    tile_side = img.shape[0] // grid_size
-    tiles = []
-    for rows in range(grid_size):
-        for columns in range(grid_size):
-            y = tile_side * rows
-            x = tile_side * columns
-            tile = img[y : y + tile_side, x : x + tile_side].copy()
-            tiles.append(tile)
-    return tiles
+class PositionValueError(Exception):
+    """Raised when a requested position is not found on the grid."""
 
 
-class PuzzleTile(tk.Canvas):
-    #Individual tile data and image states
-    def __init__(self, parent, cv2_base_img, tile_id, goal_row, goal_col, side_length):
-        super().__init__(parent, width=side_length, height=side_length, 
-                         highlightthickness=2, bd=0)
-        
-        self.tile_id = tile_id
-        self.cv2_base_img = cv2_base_img
+class Tile:
+    def __init__(self, original_position, image) -> None:
+        self.original_position = original_position
+        self.current_position = original_position   
+        self.original_orientation = 0
+        self.current_orientation = 0               
+        self._flipped_vert = False
+        self._flipped_horz = False
+        self._is_correct = False
+        self._image = image                         
+        self.display_image = image.copy()        
+
+    def __repr__(self) -> str:
+        return (
+            f"Tile(Orig: {self.original_position}, Curr: {self.current_position}, "
+            f"Rot: {self.current_orientation}°, H-Flip: {self._flipped_horz})"
+        )
+
+    def rotate(self, direction: str):
+        """Rotates tracking state and updates internal image arrays."""
+        if direction not in ("cw", "ccw"):
+            raise ValueError("Use 'cw' (clockwise) or 'ccw' (counter-clockwise).")
+
+        if direction == "cw":
+            self.current_orientation = (self.current_orientation + 90) % 360
+            self.display_image = cv2.rotate(self.display_image, cv2.ROTATE_90_CLOCKWISE)
+        else:
+            self.current_orientation = (self.current_orientation - 90) % 360
+            self.display_image = cv2.rotate(self.display_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+        return self.current_orientation
+
+    def flip(self, direction: str):
+        """Flips tracking state and updates internal image arrays."""
+        if direction in ("horizontal", "horz"):
+            self._flipped_horz = not self._flipped_horz
+            self.display_image = cv2.flip(self.display_image, 1)
+        elif direction in ("vertical", "vert"):
+            self._flipped_vert = not self._flipped_vert
+            self.display_image = cv2.flip(self.display_image, 0)
+        else:
+            raise ValueError("Invalid direction. Use 'horizontal' or 'vertical'.")
+
+    def check_is_correct(self) -> bool:
+        """Verifies if the tile matches its original state and position."""
+        if (
+            self.original_position == self.current_position
+            and self.current_orientation == self.original_orientation
+            and not self._flipped_horz
+            and not self._flipped_vert
+        ):
+            self._is_correct = True
+        else:
+            self._is_correct = False
+        return self._is_correct
+
+
+class Puzzle:
+    def __init__(self, image_path: str, grid_size: int, target_size: int = 500):
+        self._grid = grid_size
+        self._moves = 0
+        self._move_history = []
+        self.target_size = target_size
+
+        full_image = self._prepare_image(image_path, target_size)
+        image_tiles = self._split_tiles(full_image)
+
+        self._tiles = []
+        for index, img_snippet in enumerate(image_tiles):
+            row = index // self._grid
+            col = index % self._grid
+            self._tiles.append(Tile((row, col), img_snippet))
+
+    def _prepare_image(self, path: str, target: int) -> np.ndarray:
+        img = cv2.imread(path)
+        if img is None:
+            img = np.zeros((300, 300, 3), dtype=np.uint8)
+            cv2.putText(img, "PUZZLE", (40, 160), cv2.FONT_HERSHEY_SIMPLEX, 1.8, (0, 165, 255), 4)
+            cv2.rectangle(img, (15, 15), (285, 285), (0, 255, 0), 4)
+
+        h, w = img.shape[:2]
+        side = max(h, w)
+        img = cv2.resize(img, (side, side))
+        new_side = (target // self._grid) * self._grid
+        return cv2.resize(img, (new_side, new_side))
+
+    def _split_tiles(self, img: np.ndarray) -> list[np.ndarray]:
+        tile_side = img.shape[0] // self._grid
+        tiles = []
+        for row in range(self._grid):
+            for col in range(self._grid):
+                y = tile_side * row
+                x = tile_side * col
+                tiles.append(img[y : y + tile_side, x : x + tile_side].copy())
+        return tiles
+
+    def check(self) -> bool:
+        return all(tile.check_is_correct() for tile in self._tiles)
+
+    def rotate_tile(self, direction: str, orig_pos: tuple[int, int]):
+        tile = self._get_tile_by_orig_pos(orig_pos)
+        transformation = Rotate(direction, tile)
+        transformation.apply()
+        self._move_history.append(transformation)
+        self._moves += 1
+
+    def flip_tile(self, direction: str, orig_pos: tuple[int, int]):
+        tile = self._get_tile_by_orig_pos(orig_pos)
+        transformation = Flip(direction, tile)
+        transformation.apply()
+        self._move_history.append(transformation)
+        self._moves += 1
+
+    def swap_tile(self, first_orig: tuple[int, int], second_orig: tuple[int, int]):
+        tile1 = self._get_tile_by_orig_pos(first_orig)
+        tile2 = self._get_tile_by_orig_pos(second_orig)
+        transformation = Swap(tile1, tile2)
+        transformation.apply()
+        self._move_history.append(transformation)
+        self._moves += 1
+
+    def _get_tile_by_orig_pos(self, orig_pos: tuple[int, int]) -> Tile:
+        for tile in self._tiles:
+            if tile.original_position == orig_pos:
+                return tile
+        raise PositionValueError(f"No tile found tracking original coordinates {orig_pos}")
+
+    def scramble(self):
+        count = 6 #Need adjusment for other grids
+
+        for _ in range(count):
+            transform_type = random.choice(["rotate", "flip", "swap"])
+
+            r1 = random.randint(0, self._grid - 1)
+            c1 = random.randint(0, self._grid - 1)
+
+            if transform_type == "rotate":
+                direction = random.choice(["cw", "ccw"])
+                self.rotate_tile(direction, (r1, c1))
+
+            elif transform_type == "flip":
+                direction = random.choice(["horizontal", "vertical"])
+                self.flip_tile(direction, (r1, c1))
+
+            elif transform_type == "swap":
+                r2 = random.randint(0, self._grid - 1)
+                c2 = random.randint(0, self._grid - 1)
+                while (r1, c1) == (r2, c2):
+                    r2 = random.randint(0, self._grid - 1)
+                    c2 = random.randint(0, self._grid - 1)
+                
+                self.swap_tile((r1, c1), (r2, c2))
+
+
+class TkTileCanvas(tk.Canvas):
+    def __init__(self, parent, tile_back_object: Tile, side_length: int, *args, **kwargs):
+        super().__init__(
+            parent, 
+            width=side_length, 
+            height=side_length, 
+            highlightthickness=2, 
+            *args, 
+            **kwargs
+        )
+        self.tile_data = tile_back_object  
         self.side_length = side_length
-        
-        self.goal_row = goal_row
-        self.goal_col = goal_col
-        self.rotation = 0
-        self.flipped_horizontal = False
-        
-        self.goal_rotation = 0
-        self.goal_flipped = False
-        
+        self.tk_image_ref = None
         self.update_visual()
 
     def update_visual(self):
-        
-        rgb_img = cv2.cvtColor(self.cv2_base_img, cv2.COLOR_BGR2RGB)
+        """Converts internal BGR OpenCV state and explicitly registers it to this widget context."""
+        rgb_img = cv2.cvtColor(self.tile_data.display_image, cv2.COLOR_BGR2RGB)
         pil_img = Image.fromarray(rgb_img)
-        
-        if self.flipped_horizontal:
-            pil_img = pil_img.transpose(Image.FLIP_LEFT_RIGHT)
-        if self.rotation != 0:
-            pil_img = pil_img.rotate(-self.rotation)
-            
-        self.tk_photo = ImageTk.PhotoImage(image=pil_img)
+
+        self.tk_image_ref = ImageTk.PhotoImage(image=pil_img, master=self)
         
         self.delete("all")
-        self.create_image(self.side_length // 2, self.side_length // 2, image=self.tk_photo)
+        self.create_image(0, 0, anchor="nw", image=self.tk_image_ref)
 
 
-class User_moves:
-
-    def __init__(self):
+class UserMoves:
+    def __init__(self, puzzle_backend: Puzzle):
         self.selected_tile = None
+        self.puzzle = puzzle_backend
+        self.original_bg = None
 
-    def check_tile_status(self, tile):
-        # Checks tile goal state and draws/removes the tick
-        info = tile.grid_info()
- 
-        is_correct_pos = (int(info['row']) == tile.goal_row and int(info['column']) == tile.goal_col)
-        is_correct_orient = (tile.rotation == tile.goal_rotation and tile.flipped_horizontal == tile.goal_flipped)
+    def check_tile_status(self, tile_widget: TkTileCanvas):
+        """Checks structural layout status and renders success markers dynamically."""
+        tile = tile_widget.tile_data
+        info = tile_widget.grid_info()
         
-        tile.delete("tick_mark")
+        current_row = int(info.get('row', 0))
+        current_col = int(info.get('column', 0))
         
-        if is_correct_pos and is_correct_orient:
-            #Green tick top-right
-            tile.create_line(
-                tile.side_length - 25, 20, 
-                tile.side_length - 20, 25, 
-                tile.side_length - 10, 13, 
-                fill= 'light green', 
+        tile.current_position = (current_row, current_col)
+        is_correct = tile.check_is_correct()
+        tile_widget.delete("tick_mark")
+        
+        if is_correct:
+            tile_widget.create_line(
+                tile_widget.side_length - 25, 20, 
+                tile_widget.side_length - 20, 25, 
+                tile_widget.side_length - 10, 13, 
+                fill='light green', 
                 width=3, 
                 tags="tick_mark"
             )
@@ -121,23 +246,36 @@ class User_moves:
         clicked_tile = event.widget
         
         if self.selected_tile is None:
+            # 1. First Tile Clicked
             self.selected_tile = clicked_tile
+            self.original_bg = clicked_tile.cget("highlightbackground")
             clicked_tile.config(highlightbackground="red")
         else:
+            # 2. Deselecting by clicking the same piece twice
             if self.selected_tile == clicked_tile:
-                self.selected_tile.config(highlightbackground=self.selected_tile.cget("bg"))
+                clicked_tile.config(highlightbackground=self.original_bg)
                 self.selected_tile = None
                 return
                 
+            # 3. Second Tile Clicked (Swapping Mechanics)
+            # Pull the current visual positions directly from the UI layout grid
             info1 = self.selected_tile.grid_info()
             info2 = clicked_tile.grid_info()
             
-            # Swap tile coordinates
-            self.selected_tile.grid(row=info2['row'], column=info2['column'])
-            clicked_tile.grid(row=info1['row'], column=info1['column'])
+            pos1 = (int(info1['row']), int(info1['column']))
+            pos2 = (int(info2['row']), int(info2['column']))
             
-            self.selected_tile.config(highlightbackground=self.selected_tile.cget("bg"))
+            # Execute the swap in the backend puzzle engine using current board locations
+            self.puzzle.swap_tile(pos1, pos2)
             
+            # FIX: Properly separate row and column by indexing the coordinate tuples
+            self.selected_tile.grid(row=pos2[0], column=pos2[1])
+            clicked_tile.grid(row=pos1[0], column=pos1[1])
+            
+            # Unselect and clean up highlight borders safely
+            self.selected_tile.config(highlightbackground=self.original_bg)
+            
+            # Update checkmark tracking states for both targets
             self.check_tile_status(self.selected_tile)
             self.check_tile_status(clicked_tile)
             
@@ -145,63 +283,91 @@ class User_moves:
 
     def on_tile_right_click(self, event):
         clicked_tile = event.widget
-        clicked_tile.rotation = (clicked_tile.rotation + 90) % 360
-        clicked_tile.update_visual() # VISUAL UPDATE RE-RENDER ADDED
+        info = clicked_tile.grid_info()
+        current_pos = (int(info['row']), int(info['column']))
+        
+        # Pass the active board position to the engine rather than original position
+        self.puzzle.rotate_tile("cw", current_pos)
+        clicked_tile.update_visual()
         self.check_tile_status(clicked_tile)
 
     def on_tile_shift_click(self, event):
         clicked_tile = event.widget
-        clicked_tile.flipped_horizontal = not clicked_tile.flipped_horizontal
-        clicked_tile.update_visual() # VISUAL UPDATE RE-RENDER ADDED
+        info = clicked_tile.grid_info()
+        current_pos = (int(info['row']), int(info['column']))
+        
+        # Pass the active board position to the engine rather than original position
+        self.puzzle.flip_tile("horizontal", current_pos)
+        clicked_tile.update_visual()
         self.check_tile_status(clicked_tile)
 
 
-def run_puzzle_game(img_path="small_shapes.png", grid_size=3):
-    root = tk.Tk()
-    root.title("Scrambled Mosaic Puzzle Engine")
-    
-    cv2_master = load_image(img_path, grid_size, target=450)
-    cv2_tiles = split_into_tiles(cv2_master, grid_size)
-    
-    tile_side = cv2_master.shape[0] // grid_size
-    moves_engine = User_moves()
-    
-    game_tiles = []
-    tile_index = 0
-    
-    for r in range(grid_size):
-        for c in range(grid_size):
-            tile = PuzzleTile(root, cv2_tiles[tile_index], tile_index, r, c, tile_side)
-            
-            tile.bind("<Button-1>", moves_engine.on_tile_click)
-            tile.bind("<Button-2>", moves_engine.on_tile_right_click) # macOS Right-click
-            tile.bind("<Button-3>", moves_engine.on_tile_right_click) # Windows/Linux Right-click
-            tile.bind("<Shift-Button-1>", moves_engine.on_tile_shift_click)
-            
-            game_tiles.append(tile)
-            tile_index += 1
-
-    #SHuffle tiles randomly for gameplay
-    shuffled_tiles = game_tiles.copy()
-    random.shuffle(shuffled_tiles)
-    
-    idx = 0
-    for r in range(grid_size):
-        for c in range(grid_size):
-            t = shuffled_tiles[idx]
-            
-            #Apply random spin/flip
-            t.rotation = random.choice([0, 90, 180, 270])
-            t.flipped_horizontal = random.choice([True, False])
-            t.update_visual()
-            
-            #Place onto Grid layout
-            t.grid(row=r, column=c, padx=1, pady=1)
-            moves_engine.check_tile_status(t)
-            idx += 1
-            
-    root.mainloop()
+class Transform:
+    def apply(self): 
+        raise NotImplementedError
 
 
+class Rotate(Transform):
+    def __init__(self, direction: str, tile: Tile) -> None:
+        self.direction, self.tile = direction, tile
+
+    def apply(self): 
+        return self.tile.rotate(self.direction)
+
+
+class Flip(Transform):
+    def __init__(self, direction: str, tile: Tile) -> None:
+        self.direction, self.tile = direction, tile
+
+    def apply(self): 
+        return self.tile.flip(self.direction)
+
+
+class Swap(Transform):
+    def __init__(self, first_tile: Tile, second_tile: Tile) -> None:
+        self.first_tile, self.second_tile = first_tile, second_tile
+
+    def apply(self):
+        p1, p2 = self.first_tile.current_position, self.second_tile.current_position
+        return p1, p2
+
+#Test
 if __name__ == "__main__":
-    run_puzzle_game(img_path="small_shapes.png", grid_size=3)
+    try:
+        if root.winfo_exists():
+            root.destroy()
+    except (NameError, tk.TclError):
+        pass
+
+    root = tk.Tk()
+    root.title("Main Gameplay Board")
+
+    GRID_SIZE = 3
+    TARGET_PIXEL_SIZE = 450
+    TILE_SIDE = TARGET_PIXEL_SIZE // GRID_SIZE
+
+    game_puzzle = Puzzle("small_shapes.png", grid_size=GRID_SIZE, target_size=TARGET_PIXEL_SIZE)
+    controller = UserMoves(game_puzzle)
+
+    try:
+        game_puzzle.scramble()
+    except AttributeError:
+        pass
+
+    for t_obj in game_puzzle._tiles:
+        r, c = t_obj.current_position
+        
+        ui_tile = TkTileCanvas(root, t_obj, TILE_SIDE)
+        ui_tile.grid(row=r, column=c, padx=2, pady=2)
+        
+        ui_tile.update_visual()
+        
+        controller.check_tile_status(ui_tile)
+        
+        ui_tile.bind("<Button-1>", controller.on_tile_click)              # Left Click (Select / Swap)
+        ui_tile.bind("<Button-2>", controller.on_tile_right_click)        # Mac Right Click (Rotate)
+        ui_tile.bind("<Button-3>", controller.on_tile_right_click)        # Windows Right Click (Rotate)
+        ui_tile.bind("<Shift-Button-1>", controller.on_tile_shift_click)  # Shift + Left Click (Flip)
+
+        
+    root.mainloop()
