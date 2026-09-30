@@ -1,25 +1,142 @@
 import tkinter as tk
+import numpy as np
+import random
 
-class User_moves(): 
-    def __init__(self): 
+class Puzzle:
+    def __init__(self, image_list: list[np.ndarray], grid: int):
+        self._grid = grid
+        self._tiles = []
+        self._moves = 0
+        self._move_history = []
+        self._solved = False
+
+        output = enumerate(image_list)
+        for index, image in output:
+            row = index // self._grid
+            col = index % self._grid
+            self._tiles.append(Tile((row, col), image))
+
+    def __str__(self) -> str:
+        return f"Current Moves: {self._moves}"
+
+    def check(self):
+        self._solved = all([tile.check_is_correct() for tile in self._tiles])
+
+    def trans_helper(self, transformation):
+        transformation.apply()
+        self._move_history.append(transformation)
+        self._moves += 1
+        self.check()
+        return transformation
+
+    def rotate_tile(self, position):
+        if self._solved is True: 
+            return None
+        tile = next((t for t in self._tiles if t.current_position == position), None)
+        if tile is None: 
+            raise PositionValueError(f"Tile at position {position}")
+        return self.trans_helper(Rotate(tile))
+
+    def flip_tile(self, position):
+        if self._solved is True: 
+            return None
+        tile = next((t for t in self._tiles if t.current_position == position), None)
+        if tile is None: 
+            raise PositionValueError(f"Tile at position {position} is None (inside flip_tile)")
+        return self.trans_helper(Flip(tile))
+
+    def swap_tile(self, first_pos, second_pos):
+        if self._solved is True: 
+            return None
+        tile = next((t for t in self._tiles if t.current_position == first_pos), None)
+        tile2 = next((t for t in self._tiles if t.current_position == second_pos), None)
+        if tile is None or tile2 is None:
+            raise PositionValueError(f"Invalid swap positions: {first_pos}, {second_pos}")
+        return self.trans_helper(Swap(tile, tile2))
+
+    def solve(self):
+        """Finishes with self.check() so _solved becomes True."""
+        for tile in self._tiles:
+            transformation = tile.revert()
+        self._move_history = []
+        self._moves = 0
+        self.check()
+
+    def scramble(self):
+        count = 0
+        for i in range((self._grid * (self._grid + 3))):
+            i = random.choice(['rotate', 'flip', 'swap'])     
+            count += 1
+            if i == 'rotate':
+                transformation = Rotate(random.choice(self._tiles))
+                transformation.apply()
+            elif i == 'flip':
+                transformation = Flip(random.choice(self._tiles))
+                transformation.apply()
+            elif i == 'swap':
+                transformation = Swap(random.choice(self._tiles), random.choice(self._tiles))
+                transformation.apply()
+        self.check()
+
+    def view_history(self) -> list:
+        return self._move_history
+
+class User_moves: 
+    def __init__(self, puzzle_instance): 
+        self.puzzle = puzzle_instance
         self.selected_tile = None
+        self.container = None  
 
-    def check_tile_status(self, tile_widget):
-        tile_object = tile_widget.tile_data
-        is_correct = tile_object.check_is_correct()
-        tile_widget.delete("tick_mark")
+    def set_container(self, container_widget):
+        """Saves reference to parent widget hosting child tile canvas elements."""
+        self.container = container_widget
+
+    def clear_hints(self):
+        """Removes blue canvas circles from the board layout context safely."""
+        if not self.container: 
+            return
+        for tile_widget in self.container.winfo_children():
+            if isinstance(tile_widget, tk.Canvas):
+                tile_widget.delete("hint_marker")
+
+    def update_all_tile_marks(self, container_widget):
+        """Scans grid children and draws green ticks for perfectly matching configurations."""
+        for tile_widget in container_widget.winfo_children():
+            if hasattr(tile_widget, "tile_data"):
+                is_correct = tile_widget.tile_data.check_is_correct()
+                tile_widget.delete("tick_mark")
+                if is_correct:
+                    tile_widget.create_line(
+                        60, 20, 65, 25, 75, 13, 
+                        fill="#00FF00", width=3, tags="tick_mark"
+                    )
+
+    def give_swap_hint(self):
+        """Finds misplaced backend tiles and applies blue target highlight rings."""
+        if self.puzzle._solved or not self.container: 
+            return
         
-        if is_correct:
-            # Small green tick top-right
-            tile_widget.create_line(
-                60, 20, 65, 25, 75, 13, 
-                fill="#00FF00", 
-                width=3, 
-                tags="tick_mark"
-            )
+        self.clear_hints() 
+        misplaced_tiles = [t for t in self.puzzle._tiles if t.current_position != t.correct_position]
+        
+        if len(misplaced_tiles) >= 2:
+            hint_targets = misplaced_tiles[:2]
+            
+            for tile_widget in self.container.winfo_children():
+                if hasattr(tile_widget, "tile_data") and tile_widget.tile_data in hint_targets:
+                    tile_widget.create_oval(
+                        8, 8, 72, 72, 
+                        outline="#0000FF", width=3, 
+                        dash=(4, 2), tags="hint_marker"
+                    )
 
     def on_tile_click(self, event):
+        if self.puzzle._solved: 
+            return
+        self.clear_hints() 
+        
         clicked_tile = event.widget
+        parent_container = clicked_tile.master
         
         if self.selected_tile is None:
             self.selected_tile = clicked_tile
@@ -36,38 +153,49 @@ class User_moves():
                 self.selected_tile = None
                 return
                 
-            info1 = self.selected_tile.grid_info()
-            info2 = clicked_tile.grid_info()
+            # Extract historical location records cleanly from underlying objects
+            pos1 = self.selected_tile.tile_data.current_position
+            pos2 = clicked_tile.tile_data.current_position
             
-            tile1_obj = self.selected_tile.tile_data
-            tile2_obj = clicked_tile.tile_data
-            
-            tile1_obj.current_position = (int(info2['row']), int(info2['column']))
-            tile2_obj.current_position = (int(info1['row']), int(info1['column']))
-            
-            self.selected_tile.grid(row=info2['row'], column=info2['column'])
-            clicked_tile.grid(row=info1['row'], column=info1['column'])
+            try:
+                self.puzzle.swap_tile(pos1, pos2)
+                self.selected_tile.grid(row=pos2[0], column=pos2[1])
+                clicked_tile.grid(row=pos1[0], column=pos1[1])
+            except Exception as e:
+                print(f"Swap failed: {e}")
             
             self.selected_tile.config(
                 highlightbackground=self.selected_tile.cget("bg"),
                 highlightcolor=self.selected_tile.cget("bg")
             )
-            
-            self.check_tile_status(self.selected_tile)
-            self.check_tile_status(clicked_tile)
+            self.update_all_tile_marks(parent_container)
             self.selected_tile = None
 
     def on_tile_right_click(self, event):
+        if self.puzzle._solved: 
+            return
+        self.clear_hints()
+        
         clicked_tile = event.widget
-        clicked_tile.tile_data.rotate()
-        self.check_tile_status(clicked_tile)
+        pos = clicked_tile.tile_data.current_position
+        try:
+            self.puzzle.rotate_tile(pos)
+            self.update_all_tile_marks(clicked_tile.master)
+        except Exception as e: 
+            print(f"Rotation failure: {e}")
 
     def on_tile_shift_click(self, event):
+        if self.puzzle._solved: 
+            return
+        self.clear_hints()
+        
         clicked_tile = event.widget
-        clicked_tile.tile_data.flip()
-        self.check_tile_status(clicked_tile)
-
-
+        pos = clicked_tile.tile_data.current_position
+        try:
+            self.puzzle.flip_tile(pos)
+            self.update_all_tile_marks(clicked_tile.master)
+        except Exception as e: 
+            print(f"Flip failure: {e}")
 
 
 ################################################################################## FROM README ####################################################################################
