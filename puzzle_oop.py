@@ -464,15 +464,6 @@ class CreateImage:
 
 
 
-""" 
-    Makes loaded image into a square by stretching/shrinking.
-
-    Parameters:
-        img: (numpy.ndarray) image loaded in.
-        
-    Returns:
-        numpy.ndarray: a new square image. the side equals the shorter side of the input. 
-"""
 def make_square_img(img):
     height, width = img.shape[:2]
     side = max(height, width)
@@ -482,29 +473,6 @@ def make_square_img(img):
 
 
 
-
-""" 
-    Load an image and prepare it for the puzzle.
-    Image is stretched/shrunk into a square, then resized so the side divides evenly into the grid.
-    
-    Parameters:
-        path: (str) File path to image. 
-        grid_size: (int) tiles per side, 3 means 3x3, 4 means 4x4, 5 means 5x5
-        target: (int) approximate side length in pixels.
-                      the actual side may be smaller, as it is rounded down to a multiple of grid size.
-    
-    Returns:
-        numpy.ndarray: returns a square image using above function.
-                       returned image still in BGR, need to convert to RGB.
-    
-    Errors:
-        FileNotFoundError: file could not be opened, either bad path, or file not an image.
-        ValueError: image too small for chosen grid size.
-
-    NOTES:
-        TODO: 'target = 500' needs to be change. depends on window size, confirm with Jono.
-        TODO: need exact square pixel size for 'Original image' and 'Puzzle image' windows from picture sent by Jono
-"""
 def load_image(path, grid_size, target = 777):
     img  = cv2.imread(path)
 
@@ -513,7 +481,7 @@ def load_image(path, grid_size, target = 777):
 
     img = make_square_img(img)
 
-    min_tile = 10                                                                        # TODO: needs to bu tuned
+    min_tile = 10                                                                        # TODO: needs to be tuned
     side = img.shape[0]
     if side < grid_size * min_tile:
         raise ValueError("Image too small try larger imag or smaller grid.")
@@ -527,21 +495,6 @@ def load_image(path, grid_size, target = 777):
 
 
 
-
-"""
-    Cuts the square image into tiles based on grid size selected.
-
-    Parameters:
-        img: (numpy.ndarray) the cropped square loaded image. easily divisible.
-        grid_size: (int) grid size selected. 3x3, 4x4, 5x5
-
-    Returns:
-        tiles: a list of grid_size * grid_size tiles of the image.
-               in row-major order (index 0 = top-left, last index = bottom right)
-
-    NOTES:
-         This function does not check that image side divides evenly by grid_size. If it doesn't, the extra pixels are silently dropped from the right/bottom of the image.
-"""
 def split_into_tiles(img, grid_size):
     tile_side = img.shape[0] // grid_size
     tiles = []
@@ -558,22 +511,6 @@ def split_into_tiles(img, grid_size):
 
 
 
-"""
-    Rotates a tile image by 90, 180, 270 degrees.
-
-    Parameters:
-        tile_img: (numpy.ndarray) the tile image to be rotated.
-        angle: (int)  rotation angle in degrees, 90, 180, 270
-
-    Returns:
-        numpy.ndarray: the rotated tile image.
-
-    Errors:
-        ValueError: angle is not 90, 180, 270.
-
-    NOTES:
-        TODO: 'angles' and its values may need to change.
-"""
 def rotate_tile(tile_img, angle):
     if angle == 90:
         return cv2.rotate(tile_img, cv2.ROTATE_90_CLOCKWISE)
@@ -587,22 +524,6 @@ def rotate_tile(tile_img, angle):
 
 
 
-"""
-    Flips tile image horizontally or vertically.
-
-    Parameters:
-        tile_img: (numpy.ndarray) the tile image to be flipped.
-        direction: (str) direction of the flip. horizontal or vertical.
-
-    Returns:
-        numpy.ndarray: flipped tile image.
-
-    Errors:
-        ValueError: directional flip must be horizontal or vertical. rejects any other directions.
-
-    NOTES:
-        TODO: 'direction' and its values may need to cahnge.
-"""
 def flip_tile(tile_img, direction):
     if direction == 'horizontal':
         return cv2.flip(tile_img, 1)
@@ -615,36 +536,12 @@ def flip_tile(tile_img, direction):
 
 
 
-"""
-    Calculates how many transformations based on grid size selected. 6 for 3x3, 12 for 4x4, 20 for 5x5.
-
-    Parameters:
-        grid_size: (int) grid size selected. 3x3, 4x4, 5x5
-
-    Returns:
-        int: number of transformations to generate.
-"""
 def transform_count(grid_size):
     return grid_size * (grid_size - 1)
 
 
-"""
-    Reassembles a list of tiles into a single image, reflecting the state the tiles are currently in.
-    Meant to be called repeatedly:
-        once at the start to show the scrambled puzzle.
-        again after every player move to redraw the current puzzle state.
 
-    Parameters:
-        tile: list[numpy.ndarray] tiles from the split image.
-        grid_size: (int) grid size selected.
 
-    Returns:
-        numpy.ndarray: a fresh array of the reconstructed image, built from each tile's current position in the list.
-
-    NOTES:
-        - this function trusts the tile list is complete. eg. tile at index[0] is at row = 0, column = 0, etc.
-        - Has no way to check if the tiles are still in their original position, if the tiles were flipped, swapped, rotated.
-"""
 def assemble_tiles(tiles, grid_size):
     tile_side = tiles[0]._image.shape[0]
     side = tile_side * grid_size
