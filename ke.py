@@ -1,28 +1,24 @@
 import tkinter as tk
 
 class User_moves(): 
-    def __init__(self):
+    def __init__(self): 
         self.selected_tile = None
 
-    def check_tile_status(self, tile):
-        """Checks tile matches goal state and draws/removes the tick."""
-        info = tile.grid_info()
+    def check_tile_status(self, tile_widget):
+        tile_object = tile_widget.tile_data
+        is_correct = tile_object.check_is_correct()
+        tile_widget.delete("tick_mark")
         
-        is_correct_pos = (int(info['row']) == tile.goal_row and int(info['column']) == tile.goal_col)
-        is_correct_orient = (tile.rotation == tile.goal_rotation and tile.flipped_horizontal == tile.goal_flipped)
-        
-        tile.delete("tick_mark")
-        
-        if is_correct_pos and is_correct_orient:
+        if is_correct:
             # Small green tick top-right
-            tile.create_line(
+            tile_widget.create_line(
                 60, 20, 65, 25, 75, 13, 
                 fill="#00FF00", 
                 width=3, 
                 tags="tick_mark"
             )
 
-    def on_tile_click(self, event): # Fixed indentation
+    def on_tile_click(self, event):
         clicked_tile = event.widget
         
         if self.selected_tile is None:
@@ -43,7 +39,12 @@ class User_moves():
             info1 = self.selected_tile.grid_info()
             info2 = clicked_tile.grid_info()
             
-            # Swap tile positions
+            tile1_obj = self.selected_tile.tile_data
+            tile2_obj = clicked_tile.tile_data
+            
+            tile1_obj.current_position = (int(info2['row']), int(info2['column']))
+            tile2_obj.current_position = (int(info1['row']), int(info1['column']))
+            
             self.selected_tile.grid(row=info2['row'], column=info2['column'])
             clicked_tile.grid(row=info1['row'], column=info1['column'])
             
@@ -54,18 +55,18 @@ class User_moves():
             
             self.check_tile_status(self.selected_tile)
             self.check_tile_status(clicked_tile)
-            
             self.selected_tile = None
 
     def on_tile_right_click(self, event):
         clicked_tile = event.widget
-        clicked_tile.rotation = (clicked_tile.rotation + 90) % 360
+        clicked_tile.tile_data.rotate()
         self.check_tile_status(clicked_tile)
 
     def on_tile_shift_click(self, event):
         clicked_tile = event.widget
-        clicked_tile.flipped_horizontal = not clicked_tile.flipped_horizontal
+        clicked_tile.tile_data.flip()
         self.check_tile_status(clicked_tile)
+
 
 
 
