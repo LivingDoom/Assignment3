@@ -55,7 +55,6 @@ class Puzzle:
         return self.trans_helper(Swap(tile, tile2))
 
     def solve(self):
-        """Finishes with self.check() so _solved becomes True."""
         for tile in self._tiles:
             transformation = tile.revert()
         self._move_history = []
@@ -92,7 +91,6 @@ class User_moves:
         self.container = container_widget
 
     def clear_hints(self):
-        """Removes blue canvas circles from the board layout context safely."""
         if not self.container: 
             return
         for tile_widget in self.container.winfo_children():
@@ -100,7 +98,6 @@ class User_moves:
                 tile_widget.delete("hint_marker")
 
     def update_all_tile_marks(self, container_widget):
-        """Scans grid children and draws green ticks for perfectly matching configurations."""
         for tile_widget in container_widget.winfo_children():
             if hasattr(tile_widget, "tile_data"):
                 is_correct = tile_widget.tile_data.check_is_correct()
@@ -112,7 +109,6 @@ class User_moves:
                     )
 
     def give_swap_hint(self):
-        """Finds misplaced backend tiles and applies blue target highlight rings."""
         if self.puzzle._solved or not self.container: 
             return
         
@@ -153,7 +149,6 @@ class User_moves:
                 self.selected_tile = None
                 return
                 
-            # Extract historical location records cleanly from underlying objects
             pos1 = self.selected_tile.tile_data.current_position
             pos2 = clicked_tile.tile_data.current_position
             
