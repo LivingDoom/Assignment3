@@ -52,7 +52,7 @@ def make_square_img(img):
         TODO: 'target = 500' needs to be change. depends on window size, confirm with Jono.
         TODO: need exact square pixel size for 'Original image' and 'Puzzle image' windows from picture sent by Jono
 """
-def load_image(path, grid_size, target = 500):
+def load_image(path, grid_size, target = 777):
     img  = cv2.imread(path)
 
     if img is None:
@@ -176,60 +176,6 @@ def transform_count(grid_size):
 
 
 
-
-"""
-    Generates the random transforms of each tile from flipping, rotating, swapping.
-
-    Parameters:
-        grid_size: (int) grid size chosen by user.
-
-    Returns:
-        list[dict]: dictionary of all transform moves dopne. 
-                    categorized by transform type, tile transformed, value of transform.
-
-    NOTE:
-        - Need to cahng this to to produce tuples to match Ibi's code.
-        - the same tile can appear in more than one instruction; nothing prevents a tile from being transformed again in one scramble.
-        - swap instruction never picks the same tile twice. so swap always affect two different tiles.
-"""
-def generate_transform(grid_size):
-    count = transform_count(grid_size)
-    num_tiles = grid_size * grid_size
-    instructions = []
-
-    tile = random.randint(0, num_tiles - 1)
-    angle = random.choice([90, 180, 270])
-    instructions.append({"type": "rotate", "tile": tile, "value": angle})
-
-    tile = random.randint(0, num_tiles - 1)
-    direction = random.choice(["horizontal", "vertical"])
-    instructions.append({"type": "flip", "tile": tile, "value": direction})
-
-    tile_a, tile_b = random.sample(range(num_tiles), 2)
-    instructions.append({"type": "swap", "tile": tile_a, "value": tile_b})
-
-    for i in range(count - 3):
-        transform_type = random.choice(["rotate", "flip", "swap"])
-
-        if transform_type == "rotate":
-            tile = random.randint(0, num_tiles - 1)
-            angle = random.choice([90, 180, 270])
-            instructions.append({"type": "rotate", "tile": tile, "value": angle})
-
-        elif transform_type == "flip":
-            tile = random.randint(0, num_tiles - 1)
-            direction = random.choice(["horizontal", "vertical"])
-            instructions.append({"type": "flip", "tile": tile, "value": direction})
-
-        else:
-            tile_a, tile_b = random.sample(range(num_tiles), 2)
-            instructions.append({"type": "swap", "tile": tile_a, "value": tile_b})
-
-    return instructions
-
-
-
-
 """
     Reassembles a list of tiles into a single image, reflecting the state the tiles are currently in.
     Meant to be called repeatedly:
@@ -248,16 +194,24 @@ def generate_transform(grid_size):
         - Has no way to check if the tiles are still in their original position, if the tiles were flipped, swapped, rotated.
 """
 def assemble_tiles(tiles, grid_size):
-    tile_side = tiles[0].shape[0]
+    tile_side = tiles[0]._image.shape[0]
     side = tile_side * grid_size
     canvas = np.zeros((side, side, 3), dtype = np.uint8)
 
-    for index, tile in enumerate(tiles):
-        row = index // grid_size
-        column = index % grid_size
+    for tile in tiles:
+        row, column = tile.current_position
         y = tile_side * row
         x = tile_side * column
-        canvas[y : tile_side + y, x: tile_side + x] = tile
+
+        image = tile._image
+
+        if tile._flipped:
+            image = flip_tile(image, 'horizontal')
+
+        if tile.current_orientation != 0:
+            image = rotate_tile(image, tile.current_orientation)
+
+        canvas[y : tile_side + y, x : tile_side + x] = image
 
     return canvas
 
