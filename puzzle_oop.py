@@ -89,8 +89,7 @@ class Tile():
         self.current_position = original_position   # starts solved, scramble moves it later
         self.original_orientation = 0        # 0
         self.current_orientation = 0         # 0, 90, 180, 270
-        self._flipped_vert = False
-        self._flipped_horz = False
+        self._flipped = False
         self._is_correct = False
         self._image = image
 
@@ -101,7 +100,6 @@ class Tile():
                 # f"Original orientation: {self.original_orientation}\n"
                 # f"Current orientation: {self.current_orientation}\n"
                 # f"Flipped horizontally: {self._flipped_horz}\n"
-                # f"Flipped vertically: {self._flipped_vert}\n"
                )
 
     def __repr__(self) -> str:
@@ -110,8 +108,7 @@ class Tile():
                 f"Current position: {self.current_position}\n"
                 f"Original orientation: {self.original_orientation}\n"
                 f"Current orientation: {self.current_orientation}\n"
-                f"Flipped horizontally: {self._flipped_horz}\n"
-                f"Flipped vertically: {self._flipped_vert}\n\n"
+                f"Flipped horizontally: {self._flipped}\n"
               )
 
 
@@ -122,26 +119,25 @@ class Tile():
         The orientation wraps around: 0 -> 90 -> 180 -> 270 -> 0.
         Returns the new orientation in degrees.
         """
-        self.current_orientation = (self.current_orientation + 90)% 360
+        self.current_orientation = (self.current_orientation + 90) % 360
         return self.current_orientation
 
     # Flipping =============================================================
-    def flip_vert(self):
-        """Toggle the vertical flip (flipping twice puts it back). Returns nothing."""
-        self._flipped_vert = not self._flipped_vert
+    def flip(self):
+        """Toggle the flip (flipping twice puts it back). Returns nothing."""
+        """ Revamped this to have one """
+        if self.current_orientation in (90, 270):
+            self.current_orientation = (self.current_orientation + 180) % 360
+        self._flipped = not self._flipped
 
-    def flip_horz(self):
-        """Toggle the horizontal flip (flipping twice puts it back). Returns nothing."""
-        self._flipped_horz = not self._flipped_horz
 
     # Solve ================================================================
     def revert(self):
         self.current_position = self.original_position
         self.current_orientation = 0         
-        self._flipped_vert = False
-        self._flipped_horz = False
+        self._flipped = False
         self._is_correct = True
-        return self.current_position, self.current_orientation, self._flipped_vert, self._flipped_horz, self._is_correct
+        return self.current_position, self.current_orientation, self._flipped, self._is_correct
 
     
     # Checks ===============================================================
@@ -152,7 +148,7 @@ class Tile():
         and not flipped in either direction. Stores the answer in
         self._is_correct and also returns it (True / False).
         """
-        if self.original_orientation == self.current_orientation and self.original_position == self.current_position and self._flipped_horz == False and self._flipped_vert == False:
+        if self.original_orientation == self.current_orientation and self.original_position == self.current_position and self._flipped == False:
             self._is_correct = True
             return self._is_correct
         else:
@@ -254,11 +250,10 @@ class Puzzle:
         transformation = Rotate(tile)
         return self.trans_helper(transformation)
 
-    def flip_tile(self, direction, position):
+    def flip_tile(self, position):
         """Player move: flip the tile at `position`.
 
         Args:
-            direction: 'horizontal' or 'vertical' (anything else raises ValueError).
             position: (row, col) of the tile as it currently sits on the board.
         Returns the Flip object, or None if the puzzle is already solved.
         Raises PositionValueError if no tile is at `position`.
@@ -273,7 +268,7 @@ class Puzzle:
         if tile is None:
             raise PositionValueError(f"Tile at position {position} is None (inside flip_tile)")
 
-        transformation = Flip(direction, tile)
+        transformation = Flip(tile)
         return self.trans_helper(transformation)
 
     def swap_tile(self, first_pos, second_pos):
@@ -331,17 +326,22 @@ class Puzzle:
         impossible to solve. This needs fixing and I'm thinking of taking vertical 
         flips as the istructions stipulates "Flip – a tile is flipped horizontally 
         or vertically." Keyword OR not AND.
+
+        Update: I have removed the flip vertical option from the scramble method. 
+        Now the scramble method only uses flip, rotate and swap.
+        
+        Will remove these comments before final submission.
         """
         count = 0
         for i in range((self._grid * (self._grid + 3))):
             i = random.choice(['rotate', 'flip', 'swap'])     # which kind of transformation
             count += 1
-            print(f"{count}: {i}")
+            # print(f"{count}: {i}")
             if i == 'rotate':
                 transformation = Rotate(random.choice(self._tiles))
                 transformation.apply()
             elif i == 'flip':
-                transformation = Flip(('horizontal'),random.choice(self._tiles))
+                transformation = Flip(random.choice(self._tiles))
                 transformation.apply()
             elif i == 'swap':
                 # Both tiles are picked independently, so a tile can be "swapped
@@ -399,26 +399,22 @@ class Rotate(Transform):
 class Flip(Transform):
     """Flip one tile horizontally or vertically."""
 
-    def __init__(self, function, tile) -> None:
+    def __init__(self, tile) -> None:
         """
         Args:
-            function: 'horizontal' or 'vertical'.
             tile: the Tile object (not a position) to flip.
         """
         super().__init__()
-        self.function = function
         self.tile = tile
 
     def __repr__(self) -> str:
-        return f"Flipped the tile {self.function} at {self.tile.current_position}"
+        return f"Flipped the tile at {self.tile.current_position}"
 
     def apply(self):
         """Flip the tile. Raises ValueError for any other direction string.
         Returns None (the Tile flip methods return nothing)."""
-        if self.function not in ('horizontal','vertical'):
-            raise ValueError(f"Incorrect flip direction given. Use 'horizontal' or 'vertical' only.")
-        result = self.tile.flip_horz() if self.function == 'horizontal' else self.tile.flip_vert()
-        return result
+        return self.tile.flip()
+        
 
 
 class Swap(Transform):
@@ -448,7 +444,7 @@ class Swap(Transform):
 # Loads and resizes and cuts the image. 
 
 class CreateImage:
-    def __init__(self, path, grid_size, target = 500) -> None:
+    def __init__(self, path, grid_size, target) -> None:
         self.grid_size = grid_size
         self._image = load_image(path, grid_size, target)
 
@@ -457,6 +453,15 @@ class CreateImage:
 
     def get_tiles(self):
         return split_into_tiles(self._image, self.grid_size)
+
+
+
+
+############################################################### OPENCV SECTION #################################################################################
+
+# TODO: match parameter names with other members
+# NOTE: No function for swap tiles. It is in Ibi's code.
+# NOTE: Will delete all comments later.
 
 
 
@@ -474,6 +479,7 @@ def make_square_img(img):
     side = max(height, width)
 
     return cv2.resize(img, (side, side))
+
 
 
 
@@ -500,7 +506,7 @@ def make_square_img(img):
         TODO: 'target = 500' needs to be change. depends on window size, confirm with Jono.
         TODO: need exact square pixel size for 'Original image' and 'Puzzle image' windows from picture sent by Jono
 """
-def load_image(path, grid_size, target = 500):
+def load_image(path, grid_size, target = 1200):
     img  = cv2.imread(path)
 
     if img is None:
@@ -518,6 +524,8 @@ def load_image(path, grid_size, target = 500):
     img = cv2.resize(img, (new_side, new_side))
 
     return img
+
+
 
 
 
@@ -550,42 +558,174 @@ def split_into_tiles(img, grid_size):
 
 
 
+
+"""
+    Rotates a tile image by 90, 180, 270 degrees.
+
+    Parameters:
+        tile_img: (numpy.ndarray) the tile image to be rotated.
+        angle: (int)  rotation angle in degrees, 90, 180, 270
+
+    Returns:
+        numpy.ndarray: the rotated tile image.
+
+    Errors:
+        ValueError: angle is not 90, 180, 270.
+
+    NOTES:
+        TODO: 'angles' and its values may need to change.
+"""
+def rotate_tile(tile_img, angle):
+    if angle == 90:
+        return cv2.rotate(tile_img, cv2.ROTATE_90_CLOCKWISE)
+    if angle == 180:
+        return cv2.rotate(tile_img, cv2.ROTATE_180)
+    if angle == 270:
+        return cv2.rotate(tile_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    else:
+        raise ValueError(f"Invalid angle: {angle}. Must be 90, 180, or 270.")
+
+
+
+
+"""
+    Flips tile image horizontally or vertically.
+
+    Parameters:
+        tile_img: (numpy.ndarray) the tile image to be flipped.
+        direction: (str) direction of the flip. horizontal or vertical.
+
+    Returns:
+        numpy.ndarray: flipped tile image.
+
+    Errors:
+        ValueError: directional flip must be horizontal or vertical. rejects any other directions.
+
+    NOTES:
+        TODO: 'direction' and its values may need to cahnge.
+"""
+def flip_tile(tile_img, direction):
+    if direction == 'horizontal':
+        return cv2.flip(tile_img, 1)
+    if direction == 'vertical':
+        return cv2.flip(tile_img, 0)
+
+    else:
+        raise ValueError("Invalid direction: {direction}. Must be horizontal or vertical.")
+
+
+
+
+"""
+    Calculates how many transformations based on grid size selected. 6 for 3x3, 12 for 4x4, 20 for 5x5.
+
+    Parameters:
+        grid_size: (int) grid size selected. 3x3, 4x4, 5x5
+
+    Returns:
+        int: number of transformations to generate.
+"""
+def transform_count(grid_size):
+    return grid_size * (grid_size - 1)
+
+
+"""
+    Reassembles a list of tiles into a single image, reflecting the state the tiles are currently in.
+    Meant to be called repeatedly:
+        once at the start to show the scrambled puzzle.
+        again after every player move to redraw the current puzzle state.
+
+    Parameters:
+        tile: list[numpy.ndarray] tiles from the split image.
+        grid_size: (int) grid size selected.
+
+    Returns:
+        numpy.ndarray: a fresh array of the reconstructed image, built from each tile's current position in the list.
+
+    NOTES:
+        - this function trusts the tile list is complete. eg. tile at index[0] is at row = 0, column = 0, etc.
+        - Has no way to check if the tiles are still in their original position, if the tiles were flipped, swapped, rotated.
+"""
+def assemble_tiles(tiles, grid_size):
+    tile_side = tiles[0]._image.shape[0]
+    side = tile_side * grid_size
+    canvas = np.zeros((side, side, 3), dtype = np.uint8)
+
+    for tile in tiles:
+        row, column = tile.current_position
+        y = tile_side * row
+        x = tile_side * column
+
+        image = tile._image
+
+        if tile._flipped:
+            image = flip_tile(image, 'horizontal')
+
+        if tile.current_orientation != 0:
+            image = rotate_tile(image, tile.current_orientation)
+
+        canvas[y : tile_side + y, x : tile_side + x] = image
+
+    return canvas
+
+
 # =============================================================================
 # SCRATCH TESTING - only runs when this file is executed directly
 # (oop.py), NOT when another module imports it.
 # =============================================================================
 if __name__ == "__main__":
-    path = "small_shapes.png"
+    path = "1200px.png"
     pic = cv2.imread(path)
 
     if pic is None:
         raise FileNotFoundError(f"Could not load {path}")
 
-    # Placeholder data: a 25x25 pixel crop is treated as a list of 25 "tiles"
-    # (one per pixel row) just to exercise the classes. Real tiles come from
-    # the OpenCV part's split_into_tiles().
-    snippet = pic[100:125, 100:125]
-    print(snippet.shape)
 
-    puzzle = Puzzle(snippet, large_grid)
-    # puzzle.check()
-    print([t._is_correct for t in puzzle._tiles])
+    image = CreateImage(path, large_grid, 777)
+    image_tiles = image.get_tiles()
+    get_image = image.get_image()
+    cv2.imshow("Original Image", get_image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
-    # A brand-new puzzle counts as solved, so the moves below are refused until
-    # scramble() has been called.
-    # puzzle.scramble()
-    puzzle.rotate_tile((0,0))
-    puzzle.rotate_tile((0,0))
-    puzzle.rotate_tile((0,0))
-    print([t._is_correct for t in puzzle._tiles])
 
-    # print(puzzle._tiles)
+    # puzzle = Puzzle(image_tiles, large_grid)
+    # # puzzle.check()
     # print([t._is_correct for t in puzzle._tiles])
 
-    # puzzle.rotate_tile((0,0))
-    # puzzle.swap_tile(puzzle._tiles[0].current_position, puzzle._tiles[2].current_position)
-    # puzzle.flip_tile( 'vertical', puzzle._tiles[2].current_position)
-    puzzle.solve()
-    print([t._is_correct for t in puzzle._tiles])
+    # # puzzle.scramble()
+    # print(puzzle._tiles[2])
+    # puzzle.rotate_tile((0,2))
+    # # A brand-new puzzle counts as solved, so the moves below are refused until
+    # # scramble() has been called.
+    # # puzzle.scramble()
+    # # puzzle.rotate_tile((0,0))
+    # # puzzle.rotate_tile((0,0))
+    # # puzzle.rotate_tile((0,0))
+    # print([t._is_correct for t in puzzle._tiles])
+
+
+    # # puzzle.rotate_tile((0,0))
+    # # puzzle.swap_tile(puzzle._tiles[0].current_position, puzzle._tiles[2].current_position)
+    # puzzle.flip_tile(puzzle._tiles[2].current_position)
+    # # puzzle.solve()
+    # print(f"Correct positions: {[t._is_correct for t in puzzle._tiles]}")
+
+    # cv2.imshow("Puzzle Image", assemble_tiles(puzzle._tiles, large_grid))
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    puzzle = Puzzle(image_tiles, large_grid)
+
+    puzzle.rotate_tile((0, 0))
+    puzzle.flip_tile((0, 1))
+    print(puzzle._tiles[0])
+
+    puzzle_image = assemble_tiles(puzzle._tiles, large_grid)
+
+    cv2.imshow("Puzzle Image", puzzle_image)
+    cv2.waitKey(0)
+
+
     print(puzzle.view_history())
     

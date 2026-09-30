@@ -69,7 +69,11 @@ def on_tile_shift_click(self, event):
 
 
 ################################################################################## FROM README ####################################################################################
-import cv2 import random import tkinter as tk import numpy as np from PIL import Image, ImageTk
+import cv2 
+import random 
+import tkinter as tk 
+import numpy as np 
+from PIL import Image, ImageTk
 
 IMAGE_CACHE = {}
 
@@ -77,10 +81,17 @@ class Winner(Exception): """Raised when the puzzle is solved."""
 
 class PositionValueError(Exception): """Raised when a requested position is not found on the grid."""
 
-class Tile: def init(self, original_position, image) -> None: self.original_position = original_position self.current_position = original_position
-self.original_orientation = 0 self.current_orientation = 0
-self._flipped_vert = False self._flipped_horz = False self._is_correct = False self._image = image
-self.display_image = image.copy()
+class Tile: 
+    def __init__(self, original_position, image) -> None:
+        self.original_position = original_position
+        self.current_position = original_position
+        self.original_orientation = 0
+        self.current_orientation = 0
+        self._flipped_vert = False
+        self._flipped_horz = False
+        self._is_correct = False
+        self._image = image
+        self.display_image = image.copy()
 
 def __repr__(self) -> str:
     return (
@@ -126,16 +137,21 @@ def check_is_correct(self) -> bool:
         self._is_correct = False
     return self._is_correct
 
-class Puzzle: def init(self, image_path: str, grid_size: int, target_size: int = 500): self._grid = grid_size self._moves = 0 self._move_history = [] self.target_size = target_size
+class Puzzle: 
+    def __init__(self, image_path: str, grid_size: int, target_size: int = 500):
+        self._grid = grid_size
+        self._moves = 0
+        self._move_history = []
+        self.target_size = target_size
 
-    full_image = self._prepare_image(image_path, target_size)
-    image_tiles = self._split_tiles(full_image)
+        full_image = self._prepare_image(image_path, target_size)
+        image_tiles = self._split_tiles(full_image)
 
-    self._tiles = []
-    for index, img_snippet in enumerate(image_tiles):
-        row = index // self._grid
-        col = index % self._grid
-        self._tiles.append(Tile((row, col), img_snippet))
+        self._tiles = []
+        for index, img_snippet in enumerate(image_tiles):
+            row = index // self._grid
+            col = index % self._grid
+            self._tiles.append(Tile((row, col), img_snippet))
 
 def _prepare_image(self, path: str, target: int) -> np.ndarray:
     img = cv2.imread(path)
@@ -217,8 +233,13 @@ def scramble(self):
             
             self.swap_tile((r1, c1), (r2, c2))
 
-class TkTileCanvas(tk.Canvas): def init(self, parent, tile_back_object: Tile, side_length: int, *args, **kwargs): super().init( parent, width=side_length, height=side_length, highlightthickness=2, *args, **kwargs ) self.tile_data = tile_back_object
-self.side_length = side_length self.tk_image_ref = None self.update_visual()
+class TkTileCanvas(tk.Canvas): 
+    def __init__(self, parent, tile_back_object: Tile, side_length: int, *args, **kwargs):
+        super().__init__(parent, width=side_length, height=side_length, highlightthickness=2, *args, **kwargs)
+        self.tile_data = tile_back_object
+        self.side_length = side_length
+        self.tk_image_ref = None
+        self.update_visual()
 
 def update_visual(self):
     """Converts internal BGR OpenCV state and explicitly registers it to this widget context."""
@@ -230,7 +251,11 @@ def update_visual(self):
     self.delete("all")
     self.create_image(0, 0, anchor="nw", image=self.tk_image_ref)
 
-class UserMoves: def init(self, puzzle_backend: Puzzle): self.selected_tile = None self.puzzle = puzzle_backend self.original_bg = None
+class UserMoves: 
+    def __init__(self, puzzle_backend: Puzzle):
+        self.selected_tile = None
+        self.puzzle = puzzle_backend
+        self.original_bg = None
 
 def check_tile_status(self, tile_widget: TkTileCanvas):
     """Checks structural layout status and renders success markers dynamically."""
@@ -246,12 +271,12 @@ def check_tile_status(self, tile_widget: TkTileCanvas):
     
     if is_correct:
         tile_widget.create_line(
-            tile_widget.side_length - 25, 20, 
-            tile_widget.side_length - 20, 25, 
-            tile_widget.side_length - 10, 13, 
-            fill='light green', 
-            width=3, 
-            tags="tick_mark"
+        tile_widget.side_length - 25, 20, 
+        tile_widget.side_length - 20, 25, 
+        tile_widget.side_length - 10, 13, 
+        fill='light green', 
+        width=3, 
+        tags="tick_mark"
         )
 
 def on_tile_click(self, event):
@@ -313,19 +338,23 @@ def on_tile_shift_click(self, event):
     clicked_tile.update_visual()
     self.check_tile_status(clicked_tile)
 
-class Transform: def apply(self): raise NotImplementedError
+class Transform: 
+    def apply(self): raise NotImplementedError
 
-class Rotate(Transform): def init(self, direction: str, tile: Tile) -> None: self.direction, self.tile = direction, tile
+class Rotate(Transform): 
+    def __init__(self, direction: str, tile: Tile) -> None: self.direction, self.tile = direction, tile
 
 def apply(self): 
     return self.tile.rotate(self.direction)
 
-class Flip(Transform): def init(self, direction: str, tile: Tile) -> None: self.direction, self.tile = direction, tile
+class Flip(Transform): 
+    def __init__(self, direction: str, tile: Tile) -> None: self.direction, self.tile = direction, tile
 
 def apply(self): 
     return self.tile.flip(self.direction)
 
-class Swap(Transform): def init(self, first_tile: Tile, second_tile: Tile) -> None: self.first_tile, self.second_tile = first_tile, second_tile
+class Swap(Transform): 
+    def __init__(self, first_tile: Tile, second_tile: Tile) -> None: self.first_tile, self.second_tile = first_tile, second_tile
 
 def apply(self):
     p1, p2 = self.first_tile.current_position, self.second_tile.current_position
