@@ -54,7 +54,7 @@ class ImagePuzzleGame:
         xe = width * 0.735
         xf = width * 0.90
 
-        top_label_y = height - 702
+        top_label_y = 93
 
         self.open_button.place(x=xa, y=top_label_y, anchor="center")
         self.chose_image_label.place(x=xb, y=top_label_y, anchor="center")

@@ -43,8 +43,7 @@ READING STATE FROM OTHER MODULES (read only - never assign to these)
 import cv2      # only used by the test block at the bottom for now (image drawing code will need it later)
 import random
 import numpy as np
-from OCV import *
-
+import OpenCV as OCV
 
 class PositionValueError(Exception):
     """Raised when no tile is found at a position that was passed in
@@ -506,7 +505,7 @@ def make_square_img(img):
         TODO: 'target = 500' needs to be change. depends on window size, confirm with Jono.
         TODO: need exact square pixel size for 'Original image' and 'Puzzle image' windows from picture sent by Jono
 """
-def load_image(path, grid_size, target = 1200):
+def load_image(path, grid_size, target = 777):
     img  = cv2.imread(path)
 
     if img is None:
@@ -717,6 +716,7 @@ if __name__ == "__main__":
 
     puzzle = Puzzle(image_tiles, large_grid)
 
+    puzzle.swap_tile((0, 0), (1, 1))
     puzzle.rotate_tile((0, 0))
     puzzle.flip_tile((0, 1))
     print(puzzle._tiles[0])
