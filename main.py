@@ -410,7 +410,7 @@ class Swap(Transform):
 # Loads and resizes and cuts the image. 
 
 class CreateImage:
-    def __init__(self, path, grid_size, target) -> None:
+    def __init__(self, path, grid_size, target=777) -> None:
         self.grid_size = grid_size
         self._image = load_image(path, grid_size, target)
 
@@ -548,100 +548,89 @@ class ImagePuzzleGame:
         self.selected_image = ""
 
 #Canvas area
-        self.canvas = tk.Canvas(self.window)
-        self.canvas.pack(fill='both', expand=True)
-        self.canvas.bind("<Configure>", self.resize_canvas)
+        self.create_layout()
         self.create_widgets()
 
-#Draw boxes for each section
-    def resize_canvas(self, event):
-        width = event.width
-        height = event.height
-        self.canvas.delete("boxes")
-        self.canvas.delete("title")
-        self.canvas.delete("headings")
-
-        self.canvas.create_rectangle(5, 5, width - 5, 55, tags="boxes") #Top Box
-        self.canvas.create_text(width / 2, 30, text="***IMAGE PUZZLE GAME***", font=("Arial", 20, "bold"), fill="red", tags="title") #Title in centre of top box
-        self.canvas.create_rectangle(5, 55, width - 5, 130, tags="boxes")# Second Box
-        self.canvas.create_rectangle(5, 130, width / 2, height - 80, tags="boxes")# Third middle box left
-        self.canvas.create_text(width / 4, 155, text="ORIGINAL IMAGE", font=("Arial", 14), tags="headings")
-        self.canvas.create_rectangle(width / 2, 130, width - 5, height - 80, tags="boxes")# Third middle box right
-        self.canvas.create_text(width * 0.75, 155, text="PUZZLE IMAGE", font=("Arial", 14), tags="headings")
-        self.canvas.create_rectangle(5, height - 80, width - 5, height - 5, tags="boxes")# Bottom box
-
-        self.position_top_widgets()
-        self.position_bottom_widgets()
-
-    def position_top_widgets(self):
-        width = self.canvas.winfo_width()
-        height = self.canvas.winfo_height()
-
-        xa = width * 0.12
-        xb = width * 0.30
-        xc = width * 0.44
-        xd = width * 0.62
-        xe = width * 0.735
-        xf = width * 0.90
-
-        top_label_y = 93
-
-        self.open_button.place(x=xa, y=top_label_y, anchor="center")
-        self.chose_image_label.place(x=xb, y=top_label_y, anchor="center")
-        self.image_entry.place(x=xc, y=top_label_y, anchor="center")
-        self.grid_label.place(x=xd, y=top_label_y, anchor="center")
-        self.grid_box.place(x=xe, y=top_label_y, anchor="center")
-        self.load_image_button.place(x=xf, y=top_label_y, anchor="center")
-
-    def position_bottom_widgets(self):
-        width = self.canvas.winfo_width()
-        height = self.canvas.winfo_height()
-
-        x1 = width * 0.05
-        x2 = width * 0.25
-        x3 = width * 0.42
-        x4 = width * 0.58
-        x5 = width * 0.70
-        x6 = width * 0.80
-        x7 = width * 0.92
-
-        label_y = height - 42
+    def create_layout(self):
+#TOP TITLE
+        self.title_frame = ttk.Frame(self.window)
+        self.title_frame.pack(fill="x", padx=5, pady=5)
+        self.title_label = tk.Label(self.title_frame, text="*** IMAGE PUZZLE GAME ***", font=("Arial", 20, "bold"), fg="red")
+        self.title_label.pack(pady=5)
+           
+#IMAGE AND GAME CONTROLS
+        self.controls_frame = ttk.Frame(self.window)
+        self.controls_frame.pack(fill="x", padx=5, pady=5)
+        for column in range(6):
+            self.controls_frame.columnconfigure(column, weight=1)
+        self.main_frame = ttk.Frame(self.window)
+        self.main_frame.pack(fill="both", expand=True, padx=5, pady=5)
        
-        self.status.place(x=x1, y=label_y, anchor="center")
-        self.moves.place(x=x2, y=label_y, anchor="center")
-        self.incorrect_tiles.place(x=x3, y=label_y, anchor="center")
-        self.hints_left.place(x=x4, y=label_y, anchor="center")
-        self.hint_button.place(x=x5, y=label_y, anchor="center")
-        self.solved_button.place(x=x6, y=label_y, anchor="center")
-        self.instructions_button.place(x=x7, y=label_y, anchor="center")
-
+#ORIGINAL IMAGE
+        self.original_frame = tk.Frame(self.main_frame, bd=2, relief="solid")
+        self.original_frame.pack(side="left", fill="both", expand=True, padx=4)
+        self.original_heading = tk.Label(self.original_frame, text="ORIGINAL IMAGE", font=("Arial", 14, "bold"))
+        self.original_heading.pack(pady=5)
+        self.original_canvas = tk.Canvas(self.original_frame, bg="white", highlightthickness=0)
+        self.original_canvas.pack(fill="both", expand=True)
+       
+#PUZZLE IMAGE
+        self.puzzle_frame = tk.LabelFrame(self.main_frame, bd=2, relief="solid")
+        self.puzzle_frame.pack(side="right", fill="both", expand=True, padx=4)
+        self.puzzle_heading =tk.Label(self.puzzle_frame, text="PUZZLE IMAGE", font=("Arial", 14, "bold"))
+        self.puzzle_heading.pack(pady=5)
+        self.puzzle_canvas = tk.Canvas(self.puzzle_frame, bg="white", highlightthickness=0)
+        self.puzzle_canvas.pack(fill="both", expand=True)
+     
+#BOTTOM STATUS BAR
+        self.bottom_frame = ttk.Frame(self.window)
+        self.bottom_frame.pack(fill="x", padx=5, pady=5)
+        for column in range(7):
+            self.bottom_frame.columnconfigure(column, weight=1)
+ 
     def create_widgets(self):
 #Open Image button
-        self.open_button = tk.Button(self.window, text="Open An Image From Your Files Here", font=("Arial", 12), bg="white", fg="blue", bd=2, relief="solid", padx=15, pady=8, command=self.click_image)
+        self.open_button = tk.Button(self.controls_frame, text="Open An Image From Your Files Here", font=("Arial", 12), bg="white", fg="blue", bd=2, relief="solid", padx=15, pady=8, command=self.click_image)
+        self.open_button.grid(row=0, column=0, padx=10, pady=5)
 #Chose Image
-        self.chose_image_label = tk.Label(self.window, text="You have chosen Image:", font=("Arial", 12))
-        self.image_entry = tk.Entry(self.window, width=25, font=("Arial", 12))
+        self.chose_image_label = tk.Label(self.controls_frame, text="You have chosen Image:", font=("Arial", 12))
+        self.chose_image_label.grid(row=0, column=1, padx=10)
+        self.image_entry = tk.Entry(self.controls_frame, width=25, font=("Arial", 12))
+        self.image_entry.grid(row=0, column=2, padx=10)
         
 #Grid size
-        self.grid_label = tk.Label(self.window, text="Choose Your Grid Size:", font=("Arial", 12))
-        self.grid_box = ttk.Combobox(self.window, values=["3 x 3", "4 x 4", "5 x 5"], width=15, font=("Arial", 12), state="disabled") 
+        self.grid_label = tk.Label(self.controls_frame, text="Choose Your Grid Size:", font=("Arial", 12))
+        self.grid_label.grid(row=0, column=3, padx=10)
+        self.grid_box = ttk.Combobox(self.controls_frame, values=["3 x 3", "4 x 4", "5 x 5"], width=15, font=("Arial", 12), state="disabled") 
         self.grid_box.current(0)
+        self.grid_box.grid(row=0, column=4, padx=10)
+
 #Image button
-        self.load_image_button = tk.Button(self.window, text="Load Image For Puzzle Game", font=("Arial", 12), bg="white", fg="blue", bd=2, relief="solid", padx=15, pady=8, command=self.load_image)
-#Moves
-        self.moves = tk.Label(self.window, text="Number of Moves:", font=("Arial", 12))
-#Incorrect tiles
-        self.incorrect_tiles = tk.Label(self.window, text="Number of Incorrect Tiles:", font=("Arial", 12))
-#Number of Hints left
-        self.hints_left = tk.Label(self.window, text="Hints Left:", font=("Arial", 12))
-#Hint Button
-        self.hint_button = tk.Button(self.window, text="Hints", font=("Arial", 14), bg="white", fg="red", bd=2, relief="solid", padx=15, pady=8, command=self.hint)
-#Solved
-        self.solved_button = tk.Button(self.window, text="Solve", font=("Arial", 14), bg="white", fg="green", bd=2, relief="solid", padx=15, pady=8, command=self.solve)
+        self.load_image_button = tk.Button(self.controls_frame, text="Load Image For Puzzle Game", font=("Arial", 12), bg="white", fg="blue", bd=2, relief="solid", padx=15, pady=8, command=self.load_image)
+        self.load_image_button.grid(row=0, column=5, padx=20)
+
+#Bottom Buttons
 #Status
-        self.status = tk.Label(self.window, text="Status:", font=("Arial", 12))
+        self.status = tk.Label(self.bottom_frame, text="Status:", font=("Arial", 12))
+        self.status.grid(row=0, column=0, padx=10)
+#Moves
+        self.moves = tk.Label(self.bottom_frame, text="Number of Moves:", font=("Arial", 12))
+        self.moves.grid(row=0, column=2, padx=40)
+#Incorrect tiles
+        self.incorrect_tiles = tk.Label(self.bottom_frame, text="Number of Incorrect Tiles:", font=("Arial", 12))
+        self.incorrect_tiles.grid(row=0, column=4, padx=10)
+#Number of Hints left
+        self.hints_left = tk.Label(self.bottom_frame, text="Hints Left:", font=("Arial", 12))
+        self.hints_left.grid(row=0, column=6, padx=10)
+#Hint Button
+        self.hint_button = tk.Button(self.bottom_frame, text="Hints", font=("Arial", 14), bg="white", fg="red", bd=2, relief="solid", padx=15, pady=8, command=self.hint)
+        self.hint_button.grid(row=0, column=8, padx=40)
+#Solved
+        self.solved_button = tk.Button(self.bottom_frame, text="Solve", font=("Arial", 14), bg="white", fg="green", bd=2, relief="solid", padx=15, pady=8, command=self.solve)
+        self.solved_button.grid(row=0, column=9, padx=40)
 #Instructions
-        self.instructions_button = tk.Button(self.window, text="Instructions", font=("Arial", 14), bg="white", fg="blue", bd=2, relief="solid", padx=15, pady=8, command=self.instructions)
+        self.instructions_button = tk.Button(self.bottom_frame, text="Instructions", font=("Arial", 14), bg="white", fg="blue", bd=2, relief="solid", padx=15, pady=8, command=self.instructions)
+        self.instructions_button.grid(row=0, column=10, padx=40)
 
     def instructions(self):
         messagebox.showinfo(
@@ -688,65 +677,82 @@ class ImagePuzzleGame:
         
 # Get grid size
         grid_text = self.grid_box.get()
-        grid_size = int(grid_text.split(" ")[0])
+        self.grid_size = int(grid_text.split(" ")[0])
+        
 
-        width = self.canvas.winfo_width()
-        height = self.canvas.winfo_height()
-        box_left, box_right = 5, width / 2 
-        box_bottom = height -80
-        max_width = (box_right - box_left) - 40
-        max_height = (box_bottom - 175) -20
-        target = int(min(max_width, max_height))
+        print("Image:", self.selected_image)
+        print("Grid:", self.grid_size)
 
         try:
-            self.creator = CreateImage(self.selected_image, grid_size, target)
+            self.creator = CreateImage(self.selected_image, self.grid_size)
         except (FileNotFoundError, ValueError) as e:
             messagebox.showerror("Could not Load image.", str(e))
             return
 
-        self.puzzle = Puzzle(self.creator.get_tiles(), grid_size)
+        self.puzzle = Puzzle(self.creator.get_tiles(), self.grid_size)
         self.puzzle.scramble()
 
-        self.display_original_image(self.creator.get_image())
+        self.display_original_image()
         self.display_puzzle_image(self.puzzle.get_board_image())
-
-
+        self.faint_puzzle_grid(self.grid_size)
 
 #Display of Image Left side
-    def display_original_image(self,cv_image):
-        rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-        image = Image.fromarray(rgb)
-        width = self.canvas.winfo_width()
-        height = self.canvas.winfo_height()
-        box_left = 5
-        box_right = width / 2
-        box_top = 130
-        box_bottom = height - 80        
-        max_width = ((box_right - box_left) - 40)
-        max_height = ((box_bottom - 175) - 20)
+    def display_original_image(self):
+        image = Image.fromarray(cv2.cvtColor(self.creator.get_image(), cv2.COLOR_BGR2RGB))
+        width = self.original_canvas.winfo_width()
+        height = self.original_canvas.winfo_height()
+        max_width = width - 40
+        max_height = height - 20
         image.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
         photo = ImageTk.PhotoImage(image)
-        self.canvas.original_photo = photo
-        x = (box_left + box_right) / 2
-        y = (175 + box_bottom) / 2
-        self.canvas.create_image(x, y, image=photo, anchor="center", tags="original_image")
+        self.original_canvas.original_photo = photo
+        self.original_canvas.delete("original_image")
+        self.original_canvas.create_image(width / 2, height / 2, image=photo, anchor="center")
+        self.original_canvas.bind("<Configure>", self.resize_original_image)
 
-
-    def display_puzzle_image(self, cv_image):
-        rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-        image = Image.fromarray(rgb)
-
-        width = self.canvas.winfo_width()
-        height = self.canvas.winfo_height()
-        box_left, box_right = width / 2, width - 5
-        box_bottom = height - 80
-        x = (box_left + box_right) / 2
-        y = (175 + box_bottom) / 2
-
+#Display of image right side
+    def display_puzzle_image(self, puzzle_image):
+        image = Image.fromarray(cv2.cvtColor(puzzle_image, cv2.COLOR_BGR2RGB))
+        width = self.puzzle_canvas.winfo_width()
+        height = self.puzzle_canvas.winfo_height()
+        image.thumbnail((width - 40, height - 20), Image.Resampling.LANCZOS)
         photo = ImageTk.PhotoImage(image)
-        self.canvas.puzzle_photo = photo
-        self.canvas.create_image(x, y, image=photo, anchor="center", tags="puzzle_image")
+        self.canvas_puzzle_photo = photo
+        self.puzzle_canvas.delete("puzzle_image")
+        self.puzzle_canvas.delete("puzzle_grid")
+        self.puzzle_canvas.create_image(width / 2, height / 2, image=photo, anchor="center", tags="puzzle_image")
+        grid_text = self.grid_box.get()
+        grid_size = int(grid_text.split(" ")[0])
+        self.faint_puzzle_grid(grid_size)
+        self.puzzle_canvas.bind("<Configure>", self.resize_puzzle_image)
+    
+    def faint_puzzle_grid(self, grid_size):
+        width = self.puzzle_canvas.winfo_width()
+        height = self.puzzle_canvas.winfo_height()
+        max_width = width - 40
+        max_height = height - 20
+        image_size = min(max_width, max_height)
+        left = (width - image_size) / 2
+        top = (height - image_size) / 2
+        tile_size = image_size / grid_size
+        for column in range(1, grid_size):
+            x = left + column * tile_size
+            self.puzzle_canvas.create_line(x, top, x, top + image_size, fill="grey", width=2, tags="puzzle_grid")
+        for row in range(1, grid_size):
+            y = top + row * tile_size
+            self.puzzle_canvas.create_line(left, y, left + image_size, y, fill="grey", width=2, tags="puzzle_grid")            
+        self.puzzle_canvas.create_rectangle(left, top, left + image_size, top + image_size, outline="grey", width=2, tags="puzzle_grid")
+        
+    
+    def resize_original_image(self, event):
+        if not hasattr(self, "creator"):
+            return
+        self.display_original_image()
 
+    def resize_puzzle_image(self,event):
+        if not hasattr(self, "puzzle"):
+            return
+        self.display_puzzle_image(self.puzzle.get_board_image())
 
     def hint(self):
         print("Hint button pressed")
