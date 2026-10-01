@@ -47,7 +47,7 @@ class ImagePuzzleGame:
 #PUZZLE IMAGE
         self.puzzle_frame = tk.LabelFrame(self.main_frame, bd=2, relief="solid")
         self.puzzle_frame.pack(side="right", fill="both", expand=True, padx=4)
-        self.puzzle_heading =tk.Label(self.puzzle_frame, text="PUZZLE IMAGE", font=("Arial", 12, "bold"))
+        self.puzzle_heading =tk.Label(self.puzzle_frame, text="PUZZLE IMAGE", font=("Arial", 14, "bold"))
         self.puzzle_heading.pack(pady=5)
         self.puzzle_canvas = tk.Canvas(self.puzzle_frame, bg="white", highlightthickness=0)
         self.puzzle_canvas.pack(fill="both", expand=True)
