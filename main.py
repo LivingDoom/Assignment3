@@ -481,77 +481,43 @@ def assemble_tiles(tiles, grid_size):
 
 
 ############################################################### USER INTERACTION / SOLVE / HINT #################################################################################
-"""
-Kayla Section Remove before submission:
-Solving the Puzzle
-    - Left click selects a tile (coloured border). A second left click on a
-      different tile swaps the two and clears the selection. Clicking the
-      same tile again deselects it.
-    - Right click rotates a tile 90 degrees clockwise.
-    - Shift + left click flips a tile horizontally.
-    - A tile in the right place and orientation gets a small green tick.
-
-Moves and score
-    - Each swap, rotate or flip is one move. Selecting does not count.
-    - When every tile is correct the player is told and input stops.
-
-Hints
-    - Hint marks one incorrect tile with a blue circle on the puzzle and its
-      home position with a blue circle on the original. The circles go away
-      after the next move. At most 3 hints per image, then the button is
-      disabled.
-    - Solve undoes everything instantly and clears moves and score.
-"""
-
 
 class UserMoves:
-    """Turns player input into Puzzle moves, and owns the selection and hint state.
-
-    This class never draws anything and never touches Tk. The GUI works out
-    WHICH tile was clicked (a (row, col) board position) and calls the
-    matching method here, then redraws from the state held here and in Puzzle.
-    Puzzle stays the single source of truth for tile positions.
-    """
+    #Turns player input into Puzzle moves, and owns the selection and hint state.
 
     MAX_HINTS = 3
 
     def __init__(self, puzzle: Puzzle):
         self.puzzle = puzzle
-        self.selected_pos = None        # (row, col) of the selected tile, or None
+        self.selected_pos = None
         self.hints_left = self.MAX_HINTS
-        self.hint_tile = None           # Tile currently marked by a hint, or None
+        self.hint_tile = None      
 
     def _after_move(self, result):
-        """A real move happened (Puzzle returned a Transform): hints expire."""
-        if result is None:              # puzzle was already solved, nothing happened
+        if result is None: 
             return False
         self.hint_tile = None
         return True
 
     def click(self, pos):
-        """Left click. Returns True only if a swap actually happened."""
         if self.puzzle._solved:
             return False
-        if self.selected_pos is None:               # first click: select
+        if self.selected_pos is None:
             self.selected_pos = pos
             return False
-        if self.selected_pos == pos:                # same tile again: deselect
+        if self.selected_pos == pos:
             self.selected_pos = None
             return False
         first, self.selected_pos = self.selected_pos, None
         return self._after_move(self.puzzle.swap_tile(first, pos))
 
     def rotate(self, pos):
-        """Right click. Returns True if the tile was rotated."""
         return self._after_move(self.puzzle.rotate_tile(pos))
 
     def flip(self, pos):
-        """Shift + left click. Returns True if the tile was flipped."""
         return self._after_move(self.puzzle.flip_tile(pos))
 
     def hint(self):
-        """Pick one incorrect tile to mark. Returns the Tile, or None if no
-        hints are left or there is nothing left to fix. Not a move."""
         if self.hints_left <= 0 or self.puzzle._solved:
             return None
         wrong = [t for t in self.puzzle._tiles if not t._is_correct]
@@ -562,7 +528,6 @@ class UserMoves:
         return self.hint_tile
 
     def solve(self):
-        """Solve instantly (Puzzle clears moves and score) and reset UI state."""
         self.puzzle.solve()
         self.selected_pos = None
         self.hint_tile = None
