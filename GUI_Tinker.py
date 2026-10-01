@@ -167,12 +167,17 @@ class ImagePuzzleGame:
         x = width / 2
         y = height / 2
         self.original_canvas.create_image(x, y, image=photo, anchor="center")
-        self.original_canvas.bind("<Configure>", self.resize_original_image)
+        self.original_canvas.bind("<Configure>", self.resize_original_image, self.resize_puzzle_image)
 
     def resize_original_image(self, event):
         if self.selected_image == "":
             return
         self.display_original_image()
+        
+    def resize_puzzle_image(self,event):
+        if self.selected_image == "":
+            return
+        self.display_puzzle_image()
 
     def hint(self):
         print("Hint button pressed")
