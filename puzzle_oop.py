@@ -43,7 +43,7 @@ READING STATE FROM OTHER MODULES (read only - never assign to these)
 import cv2      # only used by the test block at the bottom for now (image drawing code will need it later)
 import random
 import numpy as np
-import OpenCV as OCV
+# import OpenCV as ocv
 
 class PositionValueError(Exception):
     """Raised when no tile is found at a position that was passed in
@@ -577,39 +577,14 @@ if __name__ == "__main__":
         raise FileNotFoundError(f"Could not load {path}")
 
 
-    image = CreateImage(path, large_grid, 777)
+    image = CreateImage(path, small_grid, 777)
     image_tiles = image.get_tiles()
     get_image = image.get_image()
     cv2.imshow("Original Image", get_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-
-    # puzzle = Puzzle(image_tiles, large_grid)
-    # # puzzle.check()
-    # print([t._is_correct for t in puzzle._tiles])
-
-    # # puzzle.scramble()
-    # print(puzzle._tiles[2])
-    # puzzle.rotate_tile((0,2))
-    # # A brand-new puzzle counts as solved, so the moves below are refused until
-    # # scramble() has been called.
-    # # puzzle.scramble()
-    # # puzzle.rotate_tile((0,0))
-    # # puzzle.rotate_tile((0,0))
-    # # puzzle.rotate_tile((0,0))
-    # print([t._is_correct for t in puzzle._tiles])
-
-
-    # # puzzle.rotate_tile((0,0))
-    # # puzzle.swap_tile(puzzle._tiles[0].current_position, puzzle._tiles[2].current_position)
-    # puzzle.flip_tile(puzzle._tiles[2].current_position)
-    # # puzzle.solve()
-    # print(f"Correct positions: {[t._is_correct for t in puzzle._tiles]}")
-
-    # cv2.imshow("Puzzle Image", assemble_tiles(puzzle._tiles, large_grid))
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+    
 
     puzzle = Puzzle(image_tiles, large_grid)
 
@@ -617,8 +592,9 @@ if __name__ == "__main__":
     puzzle.rotate_tile((0, 0))
     puzzle.flip_tile((0, 1))
     print(puzzle._tiles[0])
+    puzzle.scramble()
 
-    puzzle_image = assemble_tiles(puzzle._tiles, large_grid)
+    puzzle_image = assemble_tiles(puzzle._tiles, small_grid)
 
     cv2.imshow("Puzzle Image", puzzle_image)
     cv2.waitKey(0)
