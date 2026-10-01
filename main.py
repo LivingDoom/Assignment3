@@ -407,7 +407,7 @@ def load_image(path, grid_size, target=777):
 
     img = make_square_img(img)
 
-    min_tile = 10                                                                        # TODO: needs to be tuned
+    min_tile = 10                                                                        
     side = img.shape[0]
     if side < grid_size * min_tile:
         raise ValueError("Image too small try larger image or smaller grid.")
