@@ -1,1 +1,3 @@
+https://github.com/LivingDoom/Assignment3/tree/main
 
+Run main.py to open the puzzle game.
