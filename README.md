@@ -1,8 +1,7 @@
 # Assignment3
 Software Now - Assignment3
 
-
-# main.py
+Run main.py to open the Puzzle game.
 
 Group Name: [DAN/EXT12] 
 Group Members:
